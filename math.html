@@ -152,17 +152,20 @@
   <h2>Grown-up settings</h2>
   <label>Starting level:
     <select id="setLevel">
-      <option value="count">1 &ndash; Counting (0&ndash;10)</option>
-      <option value="count2">2 &ndash; Counting (0&ndash;100)</option>
-      <option value="add">3 &ndash; Adding</option>
-      <option value="sub">4 &ndash; Take away</option>
-      <option value="mix">5 &ndash; Mixed</option>
-      <option value="add2">6 &ndash; Adding (two digits)</option>
-      <option value="sub2">7 &ndash; Take away (two digits)</option>
-      <option value="mix2">8 &ndash; Mixed (two digits)</option>
+      <option value="count">1 &ndash; Counting</option>
+      <option value="add">2 &ndash; Adding</option>
+      <option value="sub">3 &ndash; Take away</option>
+      <option value="mix">4 &ndash; Mixed</option>
+      <option value="add2">5 &ndash; Adding (two digits)</option>
+      <option value="sub2">6 &ndash; Take away (two digits)</option>
+      <option value="mix2">7 &ndash; Mixed (two digits)</option>
     </select>
   </label>
-  <label>Blocks (levels 3&ndash;8):
+  <!-- Level 1 counts 0-10 by default; grown-ups can stretch it to 0-100 -->
+  <label>Counting goes up to (level 1):
+    <select id="setCount100"><option value="off">10</option><option value="on">100</option></select>
+  </label>
+  <label>Blocks (levels 2&ndash;7):
     <select id="setBlocks"><option value="on">On</option><option value="off">Off (numbers only)</option></select>
   </label>
   <label>Answer style:
@@ -181,17 +184,27 @@
 <script>
 // ---------- Saved data (stays on this device only) ----------
 const DEFAULTS = { level: "count", blocks: "on", style: "buttons", advance: "auto",
+                   count100: "off",  // "on" = level 1 counts 0-100 instead of 0-10
                    unlocked: 0,      // index of highest unlocked level (0 = level 1)
                    goal: "100" };    // correct answers needed to unlock the next level
-let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("km_settings") || "{}"));
+const savedSettings = JSON.parse(localStorage.getItem("km_settings") || "{}");
+let settings = Object.assign({}, DEFAULTS, savedSettings);
 let scores = JSON.parse(localStorage.getItem("km_scores") || "{}");
+
+// One-time upgrade from the old 8-level layout, where "Counting to 100" was its own level 2.
+// Shifts unlocked levels down by one so each child keeps the same levels open.
+if (Object.keys(savedSettings).length && !savedSettings.v) {
+  if (settings.unlocked >= 1) settings.unlocked--;
+  if (settings.level === "count2") { settings.level = "count"; settings.count100 = "on"; }
+}
+settings.v = 2;   // layout version: 2 = 7 levels, counting-to-100 is a setting
 function save() {
   localStorage.setItem("km_settings", JSON.stringify(settings));
   localStorage.setItem("km_scores", JSON.stringify(scores));
 }
 
 // Level order: used for unlocking and for the level buttons
-const ORDER = ["count", "count2", "add", "sub", "mix", "add2", "sub2", "mix2"];
+const ORDER = ["count", "add", "sub", "mix", "add2", "sub2", "mix2"];
 
 // ---------- Helpers ----------
 const $ = id => document.getElementById(id);
@@ -201,10 +214,10 @@ const scoreKey = () => settings.level;   // one score per level
 // Highest possible answer on the current level (used for multiple choice)
 function maxAnswer() {
   switch (settings.level) {
-    case "count": return 10;
+    case "count": return settings.count100 === "on" ? 100 : 10;   // grown-up setting
     case "add": case "mix": return 18;
     case "sub": return 10;
-    default: return 100;          // count2 and two-digit levels
+    default: return 100;          // two-digit levels
   }
 }
 
@@ -269,7 +282,7 @@ function newProblem() {
   if (lv === "mix")  lv = Math.random() < 0.5 ? "add"  : "sub";    // mixed: coin flip
   if (lv === "mix2") lv = Math.random() < 0.5 ? "add2" : "sub2";
 
-  if (lv === "count" || lv === "count2") { answer = rand(0, maxAnswer()); drawCount(answer); }
+  if (lv === "count") { answer = rand(0, maxAnswer()); drawCount(answer); }
   else if (lv === "add")  { const a = rand(0, 9),    b = rand(0, 9);       answer = a + b; drawAdd(a, b); }
   else if (lv === "sub")  { const a = rand(0, 10),   b = rand(0, a);       answer = a - b; drawSub(a, b); }
   else if (lv === "add2") { const a = rand(10, 90),  b = rand(10, 100 - a); answer = a + b; drawAdd(a, b); }  // total <= 100
@@ -415,7 +428,7 @@ $("lockIn").addEventListener("keydown", e => { if (e.key === "Enter") tryLock();
 $("lockCancel").onclick = closeLock;
 
 // ---------- Settings ----------
-const FIELDS = { setLevel: "level", setBlocks: "blocks", setStyle: "style", setAdvance: "advance", setGoal: "goal" };
+const FIELDS = { setLevel: "level", setCount100: "count100", setBlocks: "blocks", setStyle: "style", setAdvance: "advance", setGoal: "goal" };
 
 $("gear").onclick = () => openLock(() => {
   for (const id in FIELDS) $(id).value = settings[FIELDS[id]];
