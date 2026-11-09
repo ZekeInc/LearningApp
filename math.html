@@ -35,12 +35,9 @@
   .lvl.on { background: var(--good); color: white; }   /* current level */
   .lvl:disabled { opacity: 0.4; }                      /* locked level */
 
-  /* Problem area — the dashed box hugs its contents instead of filling the screen */
-  #blocks { min-height: 120px;                 /* smallest the box gets (was 200px) */
-            width: fit-content;                /* shrink to fit the blocks + numbers */
-            max-width: calc(100% - 20px);      /* but never wider than the screen */
-            margin: 10px auto; padding: 8px 14px;  /* inner space between border and blocks */
-            border: 4px dashed #ccc; border-radius: 16px;
+  /* Problem area — no border; uses nearly the full screen width */
+  #blocks { min-height: 120px;                 /* smallest the area gets */
+            margin: 10px 6px; padding: 4px;    /* small gap from the screen edges */
             display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
   .groups { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
   .group  { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -48,7 +45,8 @@
   .block  { width: var(--block-size); height: var(--block-size); background: var(--block); border-radius: 6px; }
   .blockB { background: var(--block2); }
   /* Two-digit adding: smaller blocks so both groups fit side by side, even on a phone */
-  #blocks.big .block { width: min(20px, calc((100vw - 140px) / 22)); height: min(20px, calc((100vw - 140px) / 22)); border-radius: 4px; }
+  /* Block size = (screen width - room for the + sign and gaps) / 22, capped at 28px on big screens */
+  #blocks.big .block { width: min(28px, calc((100vw - 90px) / 22)); height: min(28px, calc((100vw - 90px) / 22)); border-radius: 4px; }
   #blocks.big .row   { gap: 2px; }
   #blocks.big .group { gap: 2px; }
   #blocks.big .groups { flex-wrap: nowrap; gap: 10px; }
@@ -66,7 +64,7 @@
   @media (max-width: 500px) {
     .ans { font-size: 30px; min-width: 62px; min-height: 62px; border-radius: 14px; }
     #answers { gap: 8px; }
-    #blocks { min-height: 100px; }             /* phones: box height floor (was 160px) */
+    #blocks { min-height: 100px; }             /* phones: problem area height floor */
   }
 
   /* Feedback overlay */
