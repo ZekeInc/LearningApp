@@ -35,8 +35,11 @@
   .lvl.on { background: var(--good); color: white; }   /* current level */
   .lvl:disabled { opacity: 0.4; }                      /* locked level */
 
-  /* Problem area */
-  #blocks { min-height: 200px; margin: 10px auto; padding: 10px; max-width: 760px;
+  /* Problem area — the dashed box hugs its contents instead of filling the screen */
+  #blocks { min-height: 120px;                 /* smallest the box gets (was 200px) */
+            width: fit-content;                /* shrink to fit the blocks + numbers */
+            max-width: calc(100% - 20px);      /* but never wider than the screen */
+            margin: 10px auto; padding: 8px 14px;  /* inner space between border and blocks */
             border: 4px dashed #ccc; border-radius: 16px;
             display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
   .groups { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
@@ -63,7 +66,7 @@
   @media (max-width: 500px) {
     .ans { font-size: 30px; min-width: 62px; min-height: 62px; border-radius: 14px; }
     #answers { gap: 8px; }
-    #blocks { min-height: 160px; }
+    #blocks { min-height: 100px; }             /* phones: box height floor (was 160px) */
   }
 
   /* Feedback overlay */
