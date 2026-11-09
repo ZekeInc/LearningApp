@@ -290,15 +290,24 @@ let target = [];       // strokes to trace: each = list of {x, y}, 0..1 of pad w
 let targetNum = [];    // stroke number shown on each start dot (restarts for each letter)
 const isWord = () => cur.length > 1;
 
-// Size of one letter's 0..100 box in pixels, for a pad w x h
-function boxSide(w, h) { const cell = w * 0.9 / cur.length; return Math.min(cell * 0.85, h * 0.75); }
+// Words: letter boxes overlap, because lowercase letters only use the middle of their box.
+// 0.75 = each letter starts 75% of a box after the previous one. Lower = tighter word.
+const SPACING = 0.75;
+const wordUnits = () => SPACING * (cur.length - 1) + 1;   // word width, in letter boxes
 
-// Place each letter's box side by side across the pad and collect its strokes in order
+// Size of one letter's 0..100 box in pixels, for a pad w x h
+function boxSide(w, h) {
+  if (!isWord()) return Math.min(w * 0.9 * 0.85, h * 0.75);     // single letter or number
+  return Math.min(w * 0.94 / wordUnits(), h * 0.85);           // word: fill the width
+}
+
+// Place each letter's box across the pad (centred) and collect its strokes in order
 function buildTarget(w, h) {
-  const n = cur.length, cell = w * 0.9 / n, s = boxSide(w, h);
+  const n = cur.length, s = boxSide(w, h);
+  const left = (w - s * wordUnits()) / 2;           // centre the whole word
   target = []; targetNum = [];
   for (let i = 0; i < n; i++) {
-    const x0 = w * 0.05 + i * cell + (cell - s) / 2, y0 = (h - s) / 2;
+    const x0 = left + i * s * SPACING, y0 = (h - s) / 2;
     (STROKES[cur[i]] || []).forEach((st, k) => {
       target.push(st.map(p => ({ x: (x0 + p[0] / 100 * s) / w, y: (y0 + p[1] / 100 * s) / h })));
       targetNum.push(k + 1);
@@ -311,7 +320,12 @@ function layout() {
   const dpr = window.devicePixelRatio || 1;
   const maxH = Math.max(200, window.innerHeight - 280);
   let w, h;
-  if (isWord()) { w = Math.max(300, Math.min(window.innerWidth - 40, maxH * 2)); h = w * 0.5; }
+  if (isWord()) {
+    // Use the full screen width; make the pad just tall enough for the letters
+    w = Math.max(300, window.innerWidth - 40);
+    const side = Math.min(w * 0.94 / wordUnits(), maxH * 0.85);
+    h = Math.min(maxH, side * 1.18);
+  }
   else { w = h = Math.max(200, Math.min(window.innerWidth - 40, maxH)); }
   pad.style.width = w + "px";
   pad.style.height = h + "px";
