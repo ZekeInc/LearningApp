@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Kids Writing</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#4a90e2">
+<style>
+  /* ---------- Colours: tweak here ---------- */
+  :root {
+    --guide: #e6e6e6;      /* grey letter to trace */
+    --outline: #9e9e9e;    /* dashed centre line */
+    --ink: #4a90e2;        /* child's ink */
+    --good: #2e9e44;
+    --bad: #e8833a;
+  }
+  body { font-family: sans-serif; margin: 0; background: #fffdf5; text-align: center;
+         user-select: none; -webkit-user-select: none; overflow: hidden; }
+  #topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 22px; }
+  #topbar a, #gear { font-size: 30px; text-decoration: none; background: none; border: none; }
+
+  /* Progress bar toward the next strictness step */
+  #progress { position: relative; height: 30px; margin: 0 14px 6px; background: #e0e0e0; border-radius: 15px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0; background: var(--good); border-radius: 15px; transition: width 0.3s; }
+  #progressDone { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+                  font-size: 20px; font-weight: bold; color: white; }
+
+  /* Drawing area: touch-action none stops the page scrolling while tracing */
+  #pad { display: block; margin: 0 auto; background: white; border: 4px dashed #ccc; border-radius: 16px; touch-action: none; }
+  #tools { display: flex; justify-content: center; gap: 30px; padding: 12px; }
+  #tools button { font-size: 48px; min-width: 120px; min-height: 90px; border: none; border-radius: 20px; }
+  #checkBtn { background: var(--good); color: white; }
+  #clearBtn { background: #e0e0e0; }
+
+  /* Feedback + celebration overlays */
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center;
+             align-items: center; font-size: 52px; font-weight: bold; }
+  #feedback { background: rgba(255,255,255,0.92); }
+  #feedback .mark, #levelup .trophy { font-size: 180px; line-height: 1; }
+  #levelup { background: #fff3c4; z-index: 10; }
+  #levelup button { font-size: 44px; min-width: 150px; min-height: 100px; margin-top: 20px; border: none; border-radius: 22px; background: var(--good); color: white; }
+
+  /* Settings */
+  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings label { display: block; margin: 14px 0; }
+  #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
+
+  /* Grown-up lock */
+  #lock { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+          gap: 18px; background: #f2f2f2; z-index: 30; font-size: 30px; }
+  #lockQ { font-size: 56px; font-weight: bold; }
+  #lockIn { font-size: 44px; width: 180px; text-align: center; padding: 8px; border: 3px solid #999; border-radius: 14px; }
+  #lockMsg { min-height: 36px; color: var(--bad); font-weight: bold; }
+  #lock button { font-size: 28px; min-width: 140px; min-height: 64px; border: none; border-radius: 16px; margin: 0 8px; }
+  #lockOk { background: var(--good); color: white; }
+  #lockCancel { background: #cfcfcf; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-12px); } 75% { transform: translateX(12px); } }
+</style>
+</head>
+<body>
+
+<!-- Top bar: home, good-trace count + strictness level, settings gear -->
+<div id="topbar">
+  <a href="index.html" aria-label="Home">&#127968;</a>
+  <span>&#11088; <span id="score">0</span> &nbsp; &#127942; <span id="strictShow">1</span></span>
+  <button id="gear" aria-label="Grown-up settings">&#9881;&#65039;</button>
+</div>
+
+<div id="progress">   <!-- progress to next strictness step -->
+  <div id="progressFill"></div>
+  <div id="progressDone">&#127942; Complete! &#11088;</div>
+</div>
+
+<canvas id="pad"></canvas>
+
+<div id="tools">
+  <button id="clearBtn" aria-label="Erase">&#129533;</button>
+  <button id="checkBtn" aria-label="Check">&#10004;&#65039;</button>
+</div>
+
+<!-- Good / try again -->
+<div class="overlay" id="feedback">
+  <div class="mark" id="mark"></div>
+  <div id="fbText"></div>
+</div>
+
+<!-- Strictness went up -->
+<div class="overlay" id="levelup">
+  <div class="trophy">&#127942;</div>
+  <div id="levelText"></div>
+  <button id="levelOk">&#9654;&#65039;</button>
+</div>
+
+<!-- Grown-up lock: multiplication question -->
+<div id="lock">
+  <div>&#128274; Grown-ups only</div>
+  <div id="lockQ"></div>
+  <input id="lockIn" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+  <div id="lockMsg"></div>
+  <div><button id="lockCancel">Cancel</button><button id="lockOk">Enter</button></div>
+</div>
+
+<!-- Parent settings -->
+<div id="settings">
+  <h2>Grown-up settings</h2>
+  <label>Trace:
+    <select id="setContent">
+      <option value="letters">Letters</option>
+      <option value="numbers">Numbers</option>
+      <option value="both">Letters and numbers</option>
+      <option value="words">Three-letter words</option>
+    </select>
+  </label>
+  <label>Letter case (not used for words, which are lowercase):
+    <select id="setCase"><option value="upper">Capitals (A)</option><option value="lower">Lowercase (a)</option><option value="both">Both</option></select>
+  </label>
+  <label>Order:
+    <select id="setOrder"><option value="az">In order (A&ndash;Z, 0&ndash;9)</option><option value="random">Random</option></select>
+  </label>
+  <label>Check stroke order and direction (follow the arrows):
+    <select id="setStrokeCheck"><option value="on">On</option><option value="off">Off</option></select>
+  </label>
+  <label>Starting strictness (1 = anything counts, 10 = very close):
+    <input id="setStrict" type="number" min="1" max="10" style="width:90px">
+  </label>
+  <label>Good traces before strictness goes up:
+    <input id="setGoal" type="number" min="1" style="width:110px">
+  </label>
+  <p><button id="resetBtn">Reset progress</button></p>
+  <p><button id="closeSettings">Done</button></p>
+</div>
+
+<script>
+// ---------- Saved data (stays on this device only) ----------
+const DEFAULTS = { content: "letters", case: "upper", order: "az", strict: "1", goal: "100", strokeCheck: "on" };
+let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("kw_settings") || "{}"));
+let progress = Object.assign({ strict: 1, since: 0, total: 0, pos: 0 },
+                             JSON.parse(localStorage.getItem("kw_progress") || "{}"));
+function save() {
+  localStorage.setItem("kw_settings", JSON.stringify(settings));
+  localStorage.setItem("kw_progress", JSON.stringify(progress));
+}
+
+// ---------- Helpers ----------
+const $ = id => document.getElementById(id);
+const rand = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---------- Stroke data ----------
+// Each character = list of strokes in writing order; each stroke = list of [x, y] points.
+// Box is 0..100 wide and tall, y goes DOWN. Angles in degrees: 0 = right, 90 = down,
+// so a counter-clockwise curve has a DECREASING angle.
+const L = (x1, y1, x2, y2) => {                       // straight line
+  const p = [];
+  for (let i = 0; i <= 8; i++) p.push([x1 + (x2 - x1) * i / 8, y1 + (y2 - y1) * i / 8]);
+  return p;
+};
+const A = (cx, cy, rx, ry, a0, a1) => {               // curve (part of an oval)
+  const p = [], n = Math.max(6, Math.round(Math.abs(a1 - a0) / 12));
+  for (let i = 0; i <= n; i++) {
+    const a = (a0 + (a1 - a0) * i / n) * Math.PI / 180;
+    p.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+  }
+  return p;
+};
+const J = (...parts) => [].concat(...parts);          // join pieces into one stroke
+
+// Capitals + numbers: full height, 0 (top) to 100 (bottom)
+const STROKES = {
+  A: [L(50,0,15,100), L(50,0,85,100), L(29,62,71,62)],
+  B: [L(20,0,20,100), J(L(20,0,55,0), A(55,25,25,25,-90,90), L(55,50,20,50)),
+      J(L(20,50,60,50), A(60,75,25,25,-90,90), L(60,100,20,100))],
+  C: [A(55,50,40,50,-45,-315)],
+  D: [L(20,0,20,100), J(L(20,0,45,0), A(45,50,40,50,-90,90), L(45,100,20,100))],
+  E: [L(20,0,20,100), L(20,0,80,0), L(20,50,70,50), L(20,100,80,100)],
+  F: [L(20,0,20,100), L(20,0,80,0), L(20,50,70,50)],
+  G: [A(55,50,40,50,-45,-315), J(L(60,55,92,55), L(92,55,92,90))],
+  H: [L(20,0,20,100), L(80,0,80,100), L(20,50,80,50)],
+  I: [L(50,0,50,100), L(25,0,75,0), L(25,100,75,100)],
+  J: [J(L(65,0,65,75), A(42,75,23,25,0,180)), L(40,0,85,0)],
+  K: [L(20,0,20,100), L(80,0,20,55), L(38,40,80,100)],
+  L: [L(20,0,20,100), L(20,100,80,100)],
+  M: [L(15,0,15,100), J(L(15,0,50,60), L(50,60,85,0)), L(85,0,85,100)],
+  N: [L(20,0,20,100), L(20,0,80,100), L(80,100,80,0)],
+  O: [A(50,50,40,50,-90,-450)],
+  P: [L(20,0,20,100), J(L(20,0,55,0), A(55,25,25,25,-90,90), L(55,50,20,50))],
+  Q: [A(50,50,40,50,-90,-450), L(58,72,88,100)],
+  R: [L(20,0,20,100), J(L(20,0,55,0), A(55,25,25,25,-90,90), L(55,50,20,50)), L(45,50,80,100)],
+  S: [J(A(50,25,30,25,-30,-270), A(50,75,30,25,-90,150))],
+  T: [L(15,0,85,0), L(50,0,50,100)],
+  U: [J(L(20,0,20,65), A(50,65,30,35,180,0), L(80,65,80,0))],
+  V: [J(L(15,0,50,100), L(50,100,85,0))],
+  W: [J(L(10,0,30,100), L(30,100,50,30), L(50,30,70,100), L(70,100,90,0))],
+  X: [L(20,0,80,100), L(80,0,20,100)],
+  Y: [L(20,0,50,50), L(80,0,50,50), L(50,50,50,100)],
+  Z: [J(L(20,0,80,0), L(80,0,20,100), L(20,100,80,100))],
+  "0": [A(50,50,35,50,-90,-450)],
+  "1": [L(50,0,50,100)],
+  "2": [J(A(50,28,30,28,-160,20), L(78,38,20,100), L(20,100,80,100))],
+  "3": [J(A(48,25,30,25,-160,90), A(48,75,32,25,-90,160))],
+  "4": [J(L(52,0,15,65), L(15,65,88,65)), L(70,0,70,100)],   // start dots kept apart so both numbers show
+  "5": [J(L(25,0,25,45), A(48,70,32,30,-131,150)), L(25,0,78,0)],
+  "6": [J(A(60,60,40,55,-70,-180), A(50,70,30,30,180,-180))],
+  "7": [J(L(20,0,80,0), L(80,0,40,100))],
+  "8": [J(A(50,25,25,25,-20,-270), A(50,75,30,25,-90,270), A(50,25,25,25,90,-20))],
+  "9": [J(A(50,30,30,30,0,-360), L(80,30,80,100))]
+};
+
+// Lowercase. Heights: 0 = top of tall letters, 40 = middle line, 80 = baseline, 100 = bottom of tails.
+Object.assign(STROKES, {
+  a: [A(45,60,22,20,-20,-380), L(67,40,67,80)],
+  b: [L(30,0,30,80), A(50,60,20,20,180,540)],
+  c: [A(50,60,22,20,-40,-320)],
+  d: [A(45,60,20,20,-20,-380), L(65,0,65,80)],
+  e: [J(L(28,60,72,60), A(50,60,22,20,0,-320))],
+  f: [J(A(60,15,15,15,-20,-180), L(45,15,45,80)), L(30,40,62,40)],
+  g: [A(45,60,20,20,-20,-380), J(L(65,40,65,90), A(48,90,17,10,0,160))],
+  h: [L(30,0,30,80), J(A(50,58,20,18,180,360), L(70,58,70,80))],
+  i: [L(50,40,50,80), L(50,22,50,25)],                         // stroke 2 = the dot
+  j: [J(L(55,40,55,90), A(40,90,15,10,0,160)), L(55,22,55,25)], // stroke 2 = the dot
+  k: [L(30,0,30,80), L(68,40,30,65), L(42,57,70,80)],
+  l: [L(50,0,50,80)],
+  m: [L(20,40,20,80), J(A(35,55,15,15,180,360), L(50,55,50,80)), J(A(65,55,15,15,180,360), L(80,55,80,80))],
+  n: [L(30,40,30,80), J(A(50,58,20,18,180,360), L(70,58,70,80))],
+  o: [A(50,60,22,20,-90,-450)],
+  p: [L(30,40,30,100), A(50,60,20,20,180,540)],
+  q: [A(45,60,20,20,-20,-380), L(65,40,65,100)],
+  r: [L(35,40,35,80), A(55,55,20,15,180,300)],
+  s: [J(A(50,50,18,10,-30,-270), A(50,70,18,10,-90,150))],
+  t: [L(50,10,50,80), L(32,40,68,40)],
+  u: [J(L(30,40,30,62), A(50,62,20,18,180,0), L(70,62,70,40)), L(70,40,70,80)],
+  v: [J(L(28,40,50,80), L(50,80,72,40))],
+  w: [J(L(15,40,30,80), L(30,80,50,50), L(50,50,70,80), L(70,80,85,40))],
+  x: [L(30,40,70,80), L(70,40,30,80)],
+  y: [L(30,40,50,80), L(70,40,35,100)],
+  z: [J(L(30,40,70,40), L(70,40,30,80), L(30,80,70,80))]
+});
+
+// ---------- Three-letter CVC words (consonant-vowel-consonant), by short vowel ----------
+// Add or remove words freely; every letter used must have stroke data.
+const WORDS = [
+  // short a
+  "cat", "bat", "hat", "mat", "rat", "sat", "can", "fan", "man", "pan", "ran", "van",
+  "bag", "rag", "tag", "cap", "map", "nap", "tap", "dad", "bad", "sad", "ham", "jam",
+  // short e
+  "bed", "red", "fed", "hen", "pen", "ten", "men", "net", "pet", "wet", "jet", "leg",
+  "peg", "web", "beg", "set", "vet", "yes",
+  // short i
+  "big", "dig", "pig", "wig", "bin", "pin", "tin", "win", "fin", "sit", "hit", "bit",
+  "kit", "lip", "dip", "hip", "zip", "mix", "six", "fix", "lid", "kid",
+  // short o
+  "dog", "log", "fog", "hog", "hot", "pot", "dot", "cot", "mop", "top", "hop", "box",
+  "fox", "job", "cob", "rod", "not", "got",
+  // short u
+  "bug", "hug", "mug", "rug", "jug", "bun", "fun", "run", "sun", "cup", "pup", "cut",
+  "hut", "nut", "bus", "tub", "cub", "gum", "hum", "mud", "bud"
+];
+
+// ---------- What to trace ----------
+const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", LOWER = "abcdefghijklmnopqrstuvwxyz", DIGITS = "0123456789";
+function items() {
+  if (settings.content === "words") return WORDS.slice();   // three-letter CVC words
+  const letters = settings.case === "upper" ? UPPER : settings.case === "lower" ? LOWER : UPPER + LOWER;
+  const list = settings.content === "letters" ? letters : settings.content === "numbers" ? DIGITS : letters + DIGITS;
+  return list.split("");
+}
+let cur = "A";        // character or word being traced
+let strokes = [];     // child's strokes: each = list of {x, y}, both 0..1
+let busy = false;     // ignore input while an overlay is showing
+
+function nextItem() {
+  const list = items();
+  if (settings.order === "az") progress.pos = (progress.pos + 1) % list.length;
+  else { let p; do { p = rand(0, list.length - 1); } while (list.length > 1 && list[p] === cur); progress.pos = p; }
+  cur = list[progress.pos % list.length];
+  save();
+  strokes = [];
+  layout();                                        // next item may need a different pad shape
+}
+
+// ---------- Layout: square pad for one character, wide pad for words ----------
+const pad = $("pad"), ctx = pad.getContext("2d");
+const BRUSH = 0.085;   // ink thickness, as a fraction of one letter box
+const GUIDE = 0.13;    // grey guide thickness, as a fraction of one letter box
+let W = 0, H = 0;      // pad size in device pixels
+let target = [];       // strokes to trace: each = list of {x, y}, 0..1 of pad width / height
+let targetNum = [];    // stroke number shown on each start dot (restarts for each letter)
+const isWord = () => cur.length > 1;
+
+// Size of one letter's 0..100 box in pixels, for a pad w x h
+function boxSide(w, h) { const cell = w * 0.9 / cur.length; return Math.min(cell * 0.85, h * 0.75); }
+
+// Place each letter's box side by side across the pad and collect its strokes in order
+function buildTarget(w, h) {
+  const n = cur.length, cell = w * 0.9 / n, s = boxSide(w, h);
+  target = []; targetNum = [];
+  for (let i = 0; i < n; i++) {
+    const x0 = w * 0.05 + i * cell + (cell - s) / 2, y0 = (h - s) / 2;
+    (STROKES[cur[i]] || []).forEach((st, k) => {
+      target.push(st.map(p => ({ x: (x0 + p[0] / 100 * s) / w, y: (y0 + p[1] / 100 * s) / h })));
+      targetNum.push(k + 1);
+    });
+  }
+}
+
+// Size the pad (wide for words), rebuild the target, redraw
+function layout() {
+  const dpr = window.devicePixelRatio || 1;
+  const maxH = Math.max(200, window.innerHeight - 280);
+  let w, h;
+  if (isWord()) { w = Math.max(300, Math.min(window.innerWidth - 40, maxH * 2)); h = w * 0.5; }
+  else { w = h = Math.max(200, Math.min(window.innerWidth - 40, maxH)); }
+  pad.style.width = w + "px";
+  pad.style.height = h + "px";
+  const nw = Math.round(w * dpr), nh = Math.round(h * dpr);
+  if (pad.width !== nw || pad.height !== nh) { pad.width = nw; pad.height = nh; }
+  W = pad.width; H = pad.height;
+  buildTarget(W, H);
+  redraw();
+}
+
+// ---------- Drawing ----------
+// Draw a list of strokes (0..1 units) on a w x h canvas
+function pathOf(x, list, w, h, width) {
+  x.lineCap = "round"; x.lineJoin = "round"; x.lineWidth = width;
+  for (const s of list) {
+    x.beginPath();
+    x.moveTo(s[0].x * w, s[0].y * h);
+    for (const p of s) x.lineTo(p.x * w, p.y * h);
+    if (s.length === 1) x.lineTo(s[0].x * w + 0.1, s[0].y * h);   // a dot still shows
+    x.stroke();
+  }
+}
+
+function redraw() {
+  const side = boxSide(W, H);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = css("--guide");
+  pathOf(ctx, target, W, H, GUIDE * side);                // grey guide
+  ctx.setLineDash([side * 0.03, side * 0.03]);
+  ctx.strokeStyle = css("--outline");
+  pathOf(ctx, target, W, H, side * 0.009);                // dashed centre line
+  ctx.setLineDash([]);
+  const dotR = side * 0.043, placed = [];                 // start dots already drawn (pixels)
+  target.forEach((s, i) => {                              // arrows + numbered start dots
+    const k = Math.floor(s.length * 0.45), a = s[k], b = s[Math.min(k + 1, s.length - 1)];
+    const ang = Math.atan2((b.y - a.y) * H, (b.x - a.x) * W), r = side * 0.05;
+    ctx.fillStyle = css("--good");
+    ctx.beginPath();
+    ctx.moveTo(a.x * W + Math.cos(ang) * r, a.y * H + Math.sin(ang) * r);
+    ctx.lineTo(a.x * W + Math.cos(ang + 2.5) * r, a.y * H + Math.sin(ang + 2.5) * r);
+    ctx.lineTo(a.x * W + Math.cos(ang - 2.5) * r, a.y * H + Math.sin(ang - 2.5) * r);
+    ctx.fill();
+    // Start dot: if an earlier stroke starts in the same spot (like both legs of A),
+    // slide this dot a little way along its own stroke so both numbers stay visible
+    let d = { x: s[0].x * W, y: s[0].y * H };
+    for (const p of s) {
+      d = { x: p.x * W, y: p.y * H };
+      if (placed.every(q => Math.hypot(q.x - d.x, q.y - d.y) > dotR * 2.2)) break;
+    }
+    placed.push(d);
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.font = "bold " + Math.round(side * 0.05) + "px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(targetNum[i], d.x, d.y);
+  });
+  ctx.strokeStyle = css("--ink");
+  pathOf(ctx, strokes, W, H, BRUSH * side);               // child's ink on top
+}
+
+// ---------- Finger / pen input ----------
+function point(e) {
+  const r = pad.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+}
+let drawing = false;
+pad.addEventListener("pointerdown", e => {
+  if (busy) return;
+  drawing = true;
+  pad.setPointerCapture(e.pointerId);
+  strokes.push([point(e)]);
+  redraw();
+});
+pad.addEventListener("pointermove", e => { if (drawing) { strokes[strokes.length - 1].push(point(e)); redraw(); } });
+pad.addEventListener("pointerup", () => { drawing = false; });
+pad.addEventListener("pointercancel", () => { drawing = false; });
+
+// ---------- Checking the trace ----------
+// Hidden check canvas: 200 wide, same shape as the pad (small = fast)
+function mask(drawFn, ew, eh) {
+  const c = document.createElement("canvas");
+  c.width = ew; c.height = eh;
+  const x = c.getContext("2d");
+  drawFn(x);
+  const d = x.getImageData(0, 0, ew, eh).data;
+  const m = new Uint8Array(ew * eh);
+  for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 100 ? 1 : 0;
+  return m;
+}
+
+// Point a fraction f (0..1) of the way along a path of {x, y} points
+function pointAt(path, f) {
+  const d = [0];
+  for (let i = 1; i < path.length; i++) d.push(d[i - 1] + Math.hypot((path[i].x - path[i - 1].x) * W, (path[i].y - path[i - 1].y) * H));
+  const want = d[d.length - 1] * f;
+  for (let i = 1; i < path.length; i++) if (d[i] >= want) return path[i];
+  return path[path.length - 1];
+}
+
+// Stroke order + direction across the whole letter or word. TUNE T AFTER TESTING.
+function orderOK(s) {
+  if (strokes.length !== target.length) return false;
+  const side = boxSide(W, H);
+  const T = 0.26 - (s - 2) * 0.0143;               // allowed distance in letter-box units: 0.26 down to 0.15
+  for (let i = 0; i < target.length; i++) {
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+      const pe = pointAt(target[i], f), pc = pointAt(strokes[i], f);
+      const dist = Math.hypot((pe.x - pc.x) * W, (pe.y - pc.y) * H) / side;
+      if (dist > ((f === 0 || f === 1) ? T : T * 1.2)) return false;
+    }
+  }
+  return true;
+}
+
+// true = good enough for strictness s (1-10), null = nothing drawn. TUNE: tol, needCover, needNeat.
+function grade(s) {
+  const ew = 200, eh = Math.round(200 * H / W), eSide = boxSide(W, H) * ew / W;
+  const ink = mask(x => pathOf(x, strokes, ew, eh, BRUSH * eSide), ew, eh);
+  const inkCount = ink.reduce((a, b) => a + b, 0);
+  if (inkCount === 0) return null;
+  if (s <= 1) return true;                          // level 1: any attempt counts
+  if (settings.strokeCheck === "on" && !orderOK(s)) return false;
+
+  const tol = Math.round(eSide * (0.17 - (s - 2) * 0.0134));   // allowed distance from the line
+  const needCover = 0.35 + (s - 2) * 0.06;                     // 35% up to 83% of the letter traced over
+  const needNeat  = 0.50 + (s - 2) * 0.05;                     // 50% up to 90% of ink near the letter
+  const tgt     = mask(x => pathOf(x, target, ew, eh, GUIDE * eSide), ew, eh);
+  const tgtWide = mask(x => pathOf(x, target, ew, eh, GUIDE * eSide + tol * 2), ew, eh);
+  const inkWide = mask(x => pathOf(x, strokes, ew, eh, BRUSH * eSide + tol * 2), ew, eh);
+
+  let tCount = 0, covered = 0, neat = 0;
+  for (let i = 0; i < ew * eh; i++) {
+    if (tgt[i]) { tCount++; if (inkWide[i]) covered++; }
+    if (ink[i] && tgtWide[i]) neat++;
+  }
+  return covered / tCount >= needCover && neat / inkCount >= needNeat;
+}
+
+// ---------- Buttons, feedback, progress ----------
+function show(id, on) { $(id).style.display = on ? "flex" : "none"; }
+
+function updateTop() {
+  $("score").textContent = progress.total;
+  $("strictShow").textContent = progress.strict;
+  const goal = parseInt(settings.goal, 10) || 100;
+  const done = progress.strict >= 10;               // top level: full bar + trophy
+  $("progressFill").style.width = done ? "100%" : Math.min(100, progress.since / goal * 100) + "%";
+  $("progressDone").style.display = done ? "flex" : "none";
+}
+
+$("clearBtn").onclick = () => { if (!busy) { strokes = []; redraw(); } };
+
+$("checkBtn").onclick = () => {
+  if (busy) return;
+  const ok = grade(progress.strict);
+  if (ok === null) return;
+  busy = true;
+  $("mark").textContent = ok ? "✅" : "✖";
+  $("mark").style.color = ok ? "" : css("--bad");
+  $("fbText").textContent = ok ? "Great job!" : "Try again";
+  show("feedback", true);
+  if (ok) {
+    progress.total++;
+    progress.since++;
+    const goal = parseInt(settings.goal, 10) || 100;
+    const levelUp = progress.since >= goal && progress.strict < 10;
+    if (levelUp) { progress.strict++; progress.since = 0; }
+    save();
+    updateTop();
+    setTimeout(() => {
+      show("feedback", false);
+      if (levelUp) { $("levelText").textContent = "Level " + progress.strict + "!"; show("levelup", true); }
+      else { busy = false; nextItem(); }
+    }, 1200);
+  } else {
+    setTimeout(() => { show("feedback", false); strokes = []; redraw(); busy = false; }, 1200);
+  }
+};
+$("levelOk").onclick = () => { show("levelup", false); busy = false; nextItem(); };
+
+// ---------- Built-in grown-up lock ----------
+let lockAnswer = 0, lockThen = null;
+function newLockQuestion() {
+  const a = rand(6, 12), b = rand(6, 12);       // change range to adjust lock difficulty
+  lockAnswer = a * b;
+  $("lockQ").textContent = a + " × " + b + " = ?";
+  $("lockIn").value = "";
+}
+function openLock(fn) { lockThen = fn; newLockQuestion(); $("lockMsg").textContent = ""; show("lock", true); $("lockIn").focus(); }
+function closeLock() { show("lock", false); $("lockIn").blur(); }
+function tryLock() {
+  if (parseInt($("lockIn").value, 10) === lockAnswer) { closeLock(); lockThen(); return; }
+  $("lockMsg").textContent = "Not quite";
+  $("lockIn").classList.remove("shake");
+  void $("lockIn").offsetWidth;                  // restart the shake animation
+  $("lockIn").classList.add("shake");
+  newLockQuestion();
+}
+$("lockOk").onclick = tryLock;
+$("lockIn").addEventListener("keydown", e => { if (e.key === "Enter") tryLock(); });
+$("lockCancel").onclick = closeLock;
+
+// ---------- Settings ----------
+const FIELDS = { setContent: "content", setCase: "case", setOrder: "order", setStrokeCheck: "strokeCheck",
+                 setStrict: "strict", setGoal: "goal" };
+
+$("gear").onclick = () => { if (!busy) openLock(() => {
+  for (const id in FIELDS) $(id).value = settings[FIELDS[id]];
+  $("settings").style.display = "block";
+}); };
+
+$("closeSettings").onclick = () => {
+  const before = settings.strict;
+  for (const id in FIELDS) settings[FIELDS[id]] = $(id).value;
+  const s = Math.min(10, Math.max(1, parseInt(settings.strict, 10) || 1));
+  settings.strict = String(s);
+  if (settings.strict !== before) { progress.strict = s; progress.since = 0; }   // parent override
+  save();
+  $("settings").style.display = "none";
+  updateTop();
+  const list = items();
+  cur = list[progress.pos % list.length];
+  strokes = [];
+  layout();                                        // pad may switch between square and wide
+};
+
+$("resetBtn").onclick = () => {
+  if (!confirm("Reset writing progress?")) return;
+  progress = { strict: parseInt(settings.strict, 10) || 1, since: 0, total: 0, pos: 0 };
+  save();
+  updateTop();
+};
+
+// ---------- Offline ----------
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// ---------- Start ----------
+cur = items()[progress.pos % items().length];
+updateTop();
+window.addEventListener("resize", layout);
+layout();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background: rounded yellow square -->
+  <rect width="512" height="512" rx="96" fill="#ffd54f"/>
+  <!-- Three blocks: blue, pink, blue -->
+  <rect x="76"  y="196" width="110" height="110" rx="18" fill="#4a90e2"/>
+  <rect x="201" y="196" width="110" height="110" rx="18" fill="#e94e77"/>
+  <rect x="326" y="196" width="110" height="110" rx="18" fill="#4a90e2"/>
+  <!-- Plus sign underneath -->
+  <rect x="236" y="340" width="40" height="120" rx="10" fill="#2e9e44"/>
+  <rect x="196" y="380" width="120" height="40" rx="10" fill="#2e9e44"/>
+</svg>

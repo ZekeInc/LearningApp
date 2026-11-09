@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Kids Learning</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#4a90e2">
+<style>
+  body { font-family: sans-serif; margin: 0; background: #fffdf5; min-height: 100vh;
+         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+         user-select: none; -webkit-user-select: none; }
+  /* Big picture buttons: kids pick by picture, words are for grown-ups */
+  a.app { display: flex; flex-direction: column; align-items: center; justify-content: center;
+          width: 260px; height: 220px; border-radius: 30px; text-decoration: none; color: #333;
+          font-size: 34px; font-weight: bold; box-shadow: 0 6px 0 rgba(0,0,0,0.15); }
+  a.app .pic { font-size: 110px; line-height: 1.1; }
+  #math    { background: #ffd54f; }
+  #writing { background: #a5d6f7; }
+</style>
+</head>
+<body>
+  <a class="app" id="math" href="math.html"><span class="pic">&#128290;</span>Math</a>
+  <a class="app" id="writing" href="writing.html"><span class="pic">&#9999;&#65039;</span>Writing</a>
+  <!-- Pronunciation button goes here later -->
+<script>
+  // Offline: switch on the service worker (https only)
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+</script>
+</body>
+</html>

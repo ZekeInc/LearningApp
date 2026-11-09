@@ -1,0 +1,13 @@
+{
+  "name": "Kids Learning",
+  "short_name": "Kids Learning",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fffdf5",
+  "theme_color": "#4a90e2",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

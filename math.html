@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Kids Math</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#4a90e2">
+<style>
+  /* ---------- Colours and sizes: tweak here ---------- */
+  :root {
+    --block: #4a90e2;      /* first group colour (blue) */
+    --block2: #e94e77;     /* second group colour (pink) */
+    --good: #2e9e44;       /* correct (green) */
+    --bad: #e8833a;        /* wrong (orange) */
+    --btn: #ffd54f;        /* answer button colour */
+    --block-size: 34px;    /* size of one block */
+  }
+  body { font-family: sans-serif; margin: 0; background: #fffdf5; text-align: center;
+         user-select: none; -webkit-user-select: none; }
+  #topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 22px; }
+  #topbar a, #gear { font-size: 30px; text-decoration: none; background: none; border: none; }
+
+  /* Progress bar toward the next level */
+  #progress { position: relative; height: 30px; margin: 0 14px 6px; background: #e0e0e0; border-radius: 15px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0; background: var(--good); border-radius: 15px; transition: width 0.3s; }
+  #progressDone { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+                  font-size: 20px; font-weight: bold; color: white; }
+
+  /* Level buttons for kids */
+  #levelbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 4px; }
+  .lvl { font-size: 24px; min-width: 56px; min-height: 56px; border: none; border-radius: 12px; background: #e0e0e0; }
+  .lvl.on { background: var(--good); color: white; }   /* current level */
+  .lvl:disabled { opacity: 0.4; }                      /* locked level */
+
+  /* Problem area */
+  #blocks { min-height: 200px; margin: 10px auto; padding: 10px; max-width: 760px;
+            border: 4px dashed #ccc; border-radius: 16px;
+            display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
+  .groups { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+  .group  { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .row    { display: flex; gap: 5px; }
+  .block  { width: var(--block-size); height: var(--block-size); background: var(--block); border-radius: 6px; }
+  .blockB { background: var(--block2); }
+  /* Two-digit adding: smaller blocks so both groups fit side by side, even on a phone */
+  #blocks.big .block { width: min(20px, calc((100vw - 140px) / 22)); height: min(20px, calc((100vw - 140px) / 22)); border-radius: 4px; }
+  #blocks.big .row   { gap: 2px; }
+  #blocks.big .group { gap: 2px; }
+  #blocks.big .groups { flex-wrap: nowrap; gap: 10px; }
+  .crossed { position: relative; opacity: 0.5; }          /* taken-away block */
+  .crossed::after { content: "\2716"; position: absolute; inset: 0; display: flex;
+                    align-items: center; justify-content: center; color: #c0392b; font-size: 28px; }
+  .sign { font-size: 60px; font-weight: bold; }
+  .num  { font-size: 44px; font-weight: bold; }
+
+  /* Answer buttons */
+  #answers { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 10px; max-width: 560px; margin: auto; }
+  .ans { font-size: 40px; min-width: 90px; min-height: 90px; border: none; border-radius: 18px; background: var(--btn); }
+  #entry { font-size: 44px; min-height: 56px; letter-spacing: 6px; }
+  /* Phones: smaller answer buttons, 5 per row, so the keypad fits on screen */
+  @media (max-width: 500px) {
+    .ans { font-size: 30px; min-width: 62px; min-height: 62px; border-radius: 14px; }
+    #answers { gap: 8px; }
+    #blocks { min-height: 160px; }
+  }
+
+  /* Feedback overlay */
+  #feedback { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center;
+              align-items: center; background: rgba(255,255,255,0.92); font-size: 48px; font-weight: bold; }
+  #feedback .mark { font-size: 180px; line-height: 1; }
+  #nextBtn { font-size: 36px; padding: 16px 40px; margin-top: 20px; border: none; border-radius: 18px; background: var(--good); color: white; }
+
+  /* Level unlocked celebration */
+  #unlock { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center;
+            align-items: center; background: #fff3c4; font-size: 52px; font-weight: bold; z-index: 10; }
+  #unlock .trophy { font-size: 200px; line-height: 1; }
+  #unlock button { font-size: 44px; min-width: 150px; min-height: 100px; margin: 20px 12px 0;
+                   border: none; border-radius: 22px; }
+  #goNew    { background: var(--good); color: white; }
+  #stayHere { background: #cfcfcf; }
+
+  /* Settings screen */
+  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings label { display: block; margin: 14px 0; }
+  #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
+
+  /* Grown-up lock */
+  #lock { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+          gap: 18px; background: #f2f2f2; z-index: 30; font-size: 30px; }
+  #lockQ { font-size: 56px; font-weight: bold; }
+  #lockIn { font-size: 44px; width: 180px; text-align: center; padding: 8px; border: 3px solid #999; border-radius: 14px; }
+  #lockMsg { min-height: 36px; color: var(--bad); font-weight: bold; }
+  #lock button { font-size: 28px; min-width: 140px; min-height: 64px; border: none; border-radius: 16px; margin: 0 8px; }
+  #lockOk { background: var(--good); color: white; }
+  #lockCancel { background: #cfcfcf; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-12px); } 75% { transform: translateX(12px); } }
+</style>
+</head>
+<body>
+
+<!-- Top bar: home, score for the current level, settings gear -->
+<div id="topbar">
+  <a href="index.html" aria-label="Home">&#127968;</a>
+  <span>&#11088; <span id="score">0</span></span>
+  <button id="gear" aria-label="Grown-up settings">&#9881;&#65039;</button>
+</div>
+
+<div id="progress">   <!-- progress to next level -->
+  <div id="progressFill"></div>
+  <div id="progressDone">&#127942; Complete! &#11088;</div>
+</div>
+
+<div id="levelbar"></div>   <!-- level buttons, built by the script -->
+<div id="blocks"></div>     <!-- the problem is drawn here -->
+<div id="entry"></div>      <!-- typed number (keypad mode) -->
+<div id="answers"></div>    <!-- answer buttons -->
+
+<!-- Correct / wrong overlay -->
+<div id="feedback">
+  <div class="mark" id="mark"></div>
+  <div id="fbText"></div>
+  <button id="nextBtn">Next &#10145;&#65039;</button>
+</div>
+
+<!-- Level unlocked celebration -->
+<div id="unlock">
+  <div class="trophy">&#127942;</div>
+  <div id="unlockText"></div>
+  <div>
+    <button id="goNew">&#9654;&#65039; <span id="goNum"></span></button>
+    <button id="stayHere">&#8617;&#65039; <span id="stayNum"></span></button>
+  </div>
+</div>
+
+<!-- Grown-up lock: multiplication question -->
+<div id="lock">
+  <div>&#128274; Grown-ups only</div>
+  <div id="lockQ"></div>
+  <input id="lockIn" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+  <div id="lockMsg"></div>
+  <div><button id="lockCancel">Cancel</button><button id="lockOk">Enter</button></div>
+</div>
+
+<!-- Parent settings -->
+<div id="settings">
+  <h2>Grown-up settings</h2>
+  <label>Starting level:
+    <select id="setLevel">
+      <option value="count">1 &ndash; Counting (0&ndash;10)</option>
+      <option value="count2">2 &ndash; Counting (0&ndash;100)</option>
+      <option value="add">3 &ndash; Adding</option>
+      <option value="sub">4 &ndash; Take away</option>
+      <option value="mix">5 &ndash; Mixed</option>
+      <option value="add2">6 &ndash; Adding (two digits)</option>
+      <option value="sub2">7 &ndash; Take away (two digits)</option>
+      <option value="mix2">8 &ndash; Mixed (two digits)</option>
+    </select>
+  </label>
+  <label>Blocks (levels 3&ndash;8):
+    <select id="setBlocks"><option value="on">On</option><option value="off">Off (numbers only)</option></select>
+  </label>
+  <label>Answer style:
+    <select id="setStyle"><option value="buttons">Number buttons</option><option value="choice">Multiple choice (4 answers)</option></select>
+  </label>
+  <label>Correct answers to unlock next level:
+    <input id="setGoal" type="number" min="1" style="width:110px">
+  </label>
+  <label>After a correct answer:
+    <select id="setAdvance"><option value="auto">Move on automatically</option><option value="next">Wait for Next button</option></select>
+  </label>
+  <p><button id="resetBtn">Reset scores</button></p>
+  <p><button id="closeSettings">Done</button></p>
+</div>
+
+<script>
+// ---------- Saved data (stays on this device only) ----------
+const DEFAULTS = { level: "count", blocks: "on", style: "buttons", advance: "auto",
+                   unlocked: 0,      // index of highest unlocked level (0 = level 1)
+                   goal: "100" };    // correct answers needed to unlock the next level
+let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("km_settings") || "{}"));
+let scores = JSON.parse(localStorage.getItem("km_scores") || "{}");
+function save() {
+  localStorage.setItem("km_settings", JSON.stringify(settings));
+  localStorage.setItem("km_scores", JSON.stringify(scores));
+}
+
+// Level order: used for unlocking and for the level buttons
+const ORDER = ["count", "count2", "add", "sub", "mix", "add2", "sub2", "mix2"];
+
+// ---------- Helpers ----------
+const $ = id => document.getElementById(id);
+const rand = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;   // whole number lo..hi
+const scoreKey = () => settings.level;   // one score per level
+
+// Highest possible answer on the current level (used for multiple choice)
+function maxAnswer() {
+  switch (settings.level) {
+    case "count": return 10;
+    case "add": case "mix": return 18;
+    case "sub": return 10;
+    default: return 100;          // count2 and two-digit levels
+  }
+}
+
+let answer = 0;   // correct answer for the current question
+let typed = "";   // keypad entry
+let busy = false; // ignore taps while feedback or celebration is showing
+
+// ---------- Drawing ----------
+function el(cls, text) {
+  const d = document.createElement("div");
+  d.className = cls;
+  if (text !== undefined) d.textContent = text;
+  return d;
+}
+
+// Rows of up to 10 blocks. 'crossFrom' = index where crossed-out blocks start.
+function blockRows(n, extraClass, crossFrom) {
+  const col = el("group");
+  for (let i = 0; i < n; i += 10) {
+    const row = el("row");
+    for (let j = i; j < Math.min(i + 10, n); j++) {
+      row.appendChild(el("block " + (extraClass || "") + (crossFrom !== undefined && j >= crossFrom ? " crossed" : "")));
+    }
+    col.appendChild(row);
+  }
+  return col;
+}
+
+function drawCount(n) {
+  const box = $("blocks");
+  box.innerHTML = "";                       // zero = empty tray
+  box.classList.remove("big");
+  box.appendChild(blockRows(n));
+}
+
+function drawAdd(a, b) {
+  const box = $("blocks");
+  box.innerHTML = "";
+  box.classList.toggle("big", a > 10 || b > 10);   // two-digit numbers: use the smaller blocks
+  const line = el("groups");
+  const side = (n, cls) => {
+    const g = el("group");
+    if (settings.blocks === "on") g.appendChild(blockRows(n, cls));
+    g.appendChild(el("num", n));
+    return g;
+  };
+  line.append(side(a, ""), el("sign", "+"), side(b, "blockB"));
+  box.appendChild(line);
+}
+
+function drawSub(a, b) {
+  const box = $("blocks");
+  box.innerHTML = "";
+  box.classList.remove("big");
+  if (settings.blocks === "on") box.appendChild(blockRows(a, "", a - b));  // last b crossed out
+  box.appendChild(el("num", a + " − " + b));
+}
+
+// ---------- Making problems (change ranges here) ----------
+function newProblem() {
+  let lv = settings.level;
+  if (lv === "mix")  lv = Math.random() < 0.5 ? "add"  : "sub";    // mixed: coin flip
+  if (lv === "mix2") lv = Math.random() < 0.5 ? "add2" : "sub2";
+
+  if (lv === "count" || lv === "count2") { answer = rand(0, maxAnswer()); drawCount(answer); }
+  else if (lv === "add")  { const a = rand(0, 9),    b = rand(0, 9);       answer = a + b; drawAdd(a, b); }
+  else if (lv === "sub")  { const a = rand(0, 10),   b = rand(0, a);       answer = a - b; drawSub(a, b); }
+  else if (lv === "add2") { const a = rand(10, 90),  b = rand(10, 100 - a); answer = a + b; drawAdd(a, b); }  // total <= 100
+  else if (lv === "sub2") { const a = rand(10, 100), b = rand(10, a);       answer = a - b; drawSub(a, b); }  // never below 0
+}
+
+// ---------- Answer buttons ----------
+function button(label, onTap, cls) {
+  const b = document.createElement("button");
+  b.className = cls || "ans";
+  b.textContent = label;
+  b.onclick = () => { if (!busy) onTap(); };
+  return b;
+}
+
+function drawAnswers() {
+  const box = $("answers");
+  box.innerHTML = "";
+  typed = "";
+  $("entry").textContent = "";
+  if (settings.style === "choice") {
+    // Right answer + 3 close wrong ones (within 3, never below 0 or above max)
+    const opts = new Set([answer]);
+    while (opts.size < 4) {
+      const g = answer + rand(-3, 3);
+      if (g >= 0 && g <= maxAnswer()) opts.add(g);
+    }
+    [...opts].sort(() => Math.random() - 0.5).forEach(v => box.appendChild(button(v, () => check(v))));
+  } else {
+    for (let d = 0; d <= 9; d++) box.appendChild(button(d, () => {
+      if (typed.length < 3) { typed += d; $("entry").textContent = typed; }
+    }));
+    box.appendChild(button("⌫", () => { typed = typed.slice(0, -1); $("entry").textContent = typed; }));
+    box.appendChild(button("OK", () => { if (typed !== "") check(parseInt(typed, 10)); }));
+  }
+}
+
+// ---------- Level buttons ----------
+function drawLevelBar() {
+  const bar = $("levelbar");
+  bar.innerHTML = "";
+  ORDER.forEach((lv, i) => {
+    const open = i <= settings.unlocked;
+    const b = button(open ? i + 1 : "🔒", () => { settings.level = lv; save(); next(); },
+                     "lvl" + (lv === settings.level ? " on" : ""));
+    b.disabled = !open;                         // locked levels can't be tapped
+    bar.appendChild(b);
+  });
+}
+
+// ---------- Progress bar ----------
+// Fills toward unlocking the next level; solid green with a trophy once complete
+function updateProgress() {
+  const idx = ORDER.indexOf(settings.level);
+  const goal = parseInt(settings.goal, 10) || 100;
+  const score = scores[scoreKey()] || 0;
+  const done = idx < settings.unlocked || score >= goal;
+  $("progressFill").style.width = done ? "100%" : Math.min(100, score / goal * 100) + "%";
+  $("progressDone").style.display = done ? "flex" : "none";
+}
+
+// ---------- Checking ----------
+function check(value) {
+  busy = true;
+  $("feedback").style.display = "flex";
+  if (value === answer) {
+    scores[scoreKey()] = (scores[scoreKey()] || 0) + 1;
+    $("score").textContent = scores[scoreKey()];
+    $("mark").textContent = "✅";
+    $("fbText").textContent = "Correct!";
+    // Unlock the next level when the goal is reached on the highest unlocked level
+    const idx = ORDER.indexOf(settings.level);
+    const goal = parseInt(settings.goal, 10) || 100;
+    if (idx === settings.unlocked && idx < ORDER.length - 1 && scores[scoreKey()] >= goal) {
+      settings.unlocked++;
+      save();
+      updateProgress();
+      showUnlock(idx);          // celebration screen replaces the normal check mark
+      return;
+    }
+    save();
+    updateProgress();
+    if (settings.advance === "auto") { $("nextBtn").style.display = "none"; setTimeout(next, 1500); }
+    else $("nextBtn").style.display = "inline-block";
+  } else {
+    $("mark").textContent = "✖";
+    $("mark").style.color = "var(--bad)";
+    $("fbText").textContent = "Not quite, try again";
+    $("nextBtn").style.display = "none";
+    // Same problem stays so the child can count again
+    setTimeout(() => { $("feedback").style.display = "none"; $("mark").style.color = ""; busy = false; drawAnswers(); }, 1500);
+  }
+}
+
+// ---------- Level unlocked celebration ----------
+function showUnlock(oldIdx) {
+  $("feedback").style.display = "none";
+  $("unlockText").textContent = "New level " + (oldIdx + 2) + "!";
+  $("goNum").textContent = oldIdx + 2;       // new level number
+  $("stayNum").textContent = oldIdx + 1;     // current level number
+  $("unlock").style.display = "flex";
+  $("goNew").onclick = () => { settings.level = ORDER[oldIdx + 1]; save(); $("unlock").style.display = "none"; next(); };
+  $("stayHere").onclick = () => { $("unlock").style.display = "none"; next(); };
+}
+
+function next() {
+  $("feedback").style.display = "none";
+  busy = false;
+  newProblem();
+  drawAnswers();
+  drawLevelBar();
+  $("score").textContent = scores[scoreKey()] || 0;
+  updateProgress();
+}
+$("nextBtn").onclick = next;
+
+// ---------- Built-in grown-up lock ----------
+let lockAnswer = 0, lockThen = null;
+function newLockQuestion() {
+  const a = rand(6, 12), b = rand(6, 12);       // change range to adjust lock difficulty
+  lockAnswer = a * b;
+  $("lockQ").textContent = a + " × " + b + " = ?";
+  $("lockIn").value = "";
+}
+function openLock(fn) {
+  lockThen = fn;
+  newLockQuestion();
+  $("lockMsg").textContent = "";
+  $("lock").style.display = "flex";
+  $("lockIn").focus();
+}
+function closeLock() { $("lock").style.display = "none"; $("lockIn").blur(); }
+function tryLock() {
+  if (parseInt($("lockIn").value, 10) === lockAnswer) { closeLock(); lockThen(); return; }
+  $("lockMsg").textContent = "Not quite";
+  $("lockIn").classList.remove("shake");
+  void $("lockIn").offsetWidth;                  // restart the shake animation
+  $("lockIn").classList.add("shake");
+  newLockQuestion();
+}
+$("lockOk").onclick = tryLock;
+$("lockIn").addEventListener("keydown", e => { if (e.key === "Enter") tryLock(); });
+$("lockCancel").onclick = closeLock;
+
+// ---------- Settings ----------
+const FIELDS = { setLevel: "level", setBlocks: "blocks", setStyle: "style", setAdvance: "advance", setGoal: "goal" };
+
+$("gear").onclick = () => openLock(() => {
+  for (const id in FIELDS) $(id).value = settings[FIELDS[id]];
+  $("settings").style.display = "block";
+});
+
+$("closeSettings").onclick = () => {
+  const before = settings.level;
+  for (const id in FIELDS) settings[FIELDS[id]] = $(id).value;
+  // Parent changed the starting level: unlock up to exactly that level
+  if (settings.level !== before) settings.unlocked = ORDER.indexOf(settings.level);
+  save();
+  $("settings").style.display = "none";
+  next();
+};
+
+$("resetBtn").onclick = () => {   // clears scores, keeps unlocked levels
+  if (confirm("Reset all scores?")) { scores = {}; save(); $("score").textContent = 0; updateProgress(); }
+};
+
+// ---------- Offline: switch on the service worker (https only) ----------
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// ---------- Start ----------
+next();
+</script>
+</body>
+</html>
