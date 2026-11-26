@@ -9,22 +9,32 @@
 <meta name="theme-color" content="#4a90e2">
 <style>
   body { font-family: sans-serif; margin: 0; background: #fffdf5; min-height: 100vh;
-         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
          user-select: none; -webkit-user-select: none; }
   /* Big picture buttons: kids pick by picture, words are for grown-ups */
   a.app { display: flex; flex-direction: column; align-items: center; justify-content: center;
-          width: 260px; height: 220px; border-radius: 30px; text-decoration: none; color: #333;
+          width: 260px; height: 200px; border-radius: 30px; text-decoration: none; color: #333;
           font-size: 34px; font-weight: bold; box-shadow: 0 6px 0 rgba(0,0,0,0.15); }
-  a.app .pic { font-size: 110px; line-height: 1.1; }
+  a.app .pic { font-size: 100px; line-height: 1.1; }
   #math    { background: #ffd54f; }
   #writing { background: #a5d6f7; }
+  #clock   { background: #c8e6c9; }
+  /* Version number, top right corner */
+  #version { position: fixed; top: 8px; right: 12px; font-size: 16px; color: #999; }
 </style>
 </head>
 <body>
+  <div id="version"></div>
   <a class="app" id="math" href="math.html"><span class="pic">&#128290;</span>Math</a>
   <a class="app" id="writing" href="writing.html"><span class="pic">&#9999;&#65039;</span>Writing</a>
+  <a class="app" id="clock" href="clock.html"><span class="pic">&#128339;</span>Clock</a>
   <!-- Pronunciation button goes here later -->
 <script>
+  // Show the version from sw.js (e.g. kids-learning-v7 shows as v7), so it's only set in one place
+  fetch("sw.js").then(r => r.text()).then(t => {
+    const m = t.match(/kids-learning-(v[0-9.]+)/);
+    if (m) document.getElementById("version").textContent = m[1];
+  }).catch(() => {});
   // Offline: switch on the service worker (https only)
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("sw.js").catch(() => {});

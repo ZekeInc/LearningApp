@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Kids Clock</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#4a90e2">
+<style>
+  /* ---------- Colours: tweak here (clock colours are in the script, COL) ---------- */
+  :root { --good: #2e9e44; --bad: #e8833a; --btn: #ffd54f; }
+  body { font-family: sans-serif; margin: 0; background: #fffdf5; text-align: center; user-select: none; -webkit-user-select: none; }
+  #topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 22px; }
+  #topbar a, #gear { font-size: 30px; text-decoration: none; background: none; border: none; }
+
+  /* Progress bar toward the next level */
+  #progress { position: relative; height: 30px; margin: 0 14px 6px; background: #e0e0e0; border-radius: 15px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0; background: var(--good); border-radius: 15px; transition: width 0.3s; }
+  #progressDone { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: white; }
+
+  /* Level buttons for kids */
+  #levelbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 3px; }
+  .lvl { font-size: 17px; min-width: 39px; min-height: 39px; border: none; border-radius: 8px; background: #e0e0e0; }
+  .lvl.on { background: var(--good); color: white; }   /* current level */
+  .lvl:disabled { opacity: 0.4; }                      /* locked level */
+
+  /* Time to set (hands mode), or a "?" (pick mode) */
+  #target { font-size: 48px; font-weight: bold; min-height: 60px; margin-top: 4px; }
+
+  /* The clock: square, as big as fits */
+  #clock { display: block; margin: 4px auto; width: min(90vw, calc(100vh - 380px)); min-width: 220px; max-width: 560px;
+           height: auto; aspect-ratio: 1; touch-action: none; }
+
+  /* Answer buttons */
+  #answers { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 10px; max-width: 640px; margin: auto; }
+  .ans { font-size: 32px; min-width: 150px; min-height: 80px; padding: 0 14px; border: none; border-radius: 18px; background: var(--btn); }
+  @media (max-width: 500px) { .ans { font-size: 22px; min-width: 130px; min-height: 64px; } #target { font-size: 34px; } }
+
+  /* Feedback overlay */
+  #feedback { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.92); font-size: 48px; font-weight: bold; }
+  #feedback .mark { font-size: 180px; line-height: 1; }
+  #nextBtn { font-size: 36px; padding: 16px 40px; margin-top: 20px; border: none; border-radius: 18px; background: var(--good); color: white; }
+
+  /* Level unlocked celebration */
+  #unlock { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; background: #fff3c4; font-size: 52px; font-weight: bold; z-index: 10; }
+  #unlock .trophy { font-size: 200px; line-height: 1; }
+  #unlock button { font-size: 44px; min-width: 150px; min-height: 100px; margin: 20px 12px 0; border: none; border-radius: 22px; }
+  #goNew { background: var(--good); color: white; }
+  #stayHere { background: #cfcfcf; }
+
+  /* Settings screen */
+  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings label { display: block; margin: 14px 0; }
+  #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
+
+  /* Grown-up lock */
+  #lock { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #f2f2f2; z-index: 30; font-size: 30px; }
+  #lockQ { font-size: 56px; font-weight: bold; }
+  #lockIn { font-size: 44px; width: 180px; text-align: center; padding: 8px; border: 3px solid #999; border-radius: 14px; }
+  #lockMsg { min-height: 36px; color: var(--bad); font-weight: bold; }
+  #lock button { font-size: 28px; min-width: 140px; min-height: 64px; border: none; border-radius: 16px; margin: 0 8px; }
+  #lockOk { background: var(--good); color: white; }
+  #lockCancel { background: #cfcfcf; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-12px); } 75% { transform: translateX(12px); } }
+</style>
+</head>
+<body>
+
+<!-- Top bar: home, score for the current level, settings gear -->
+<div id="topbar">
+  <a href="index.html" aria-label="Home">&#127968;</a>
+  <span>&#11088; <span id="score">0</span></span>
+  <button id="gear" aria-label="Grown-up settings">&#9881;&#65039;</button>
+</div>
+
+<div id="progress"><div id="progressFill"></div><div id="progressDone">&#127942; Complete! &#11088;</div></div>
+<div id="levelbar"></div>   <!-- level buttons, built by the script -->
+<div id="target"></div>     <!-- time to set (hands mode) -->
+<svg id="clock" viewBox="-50 -50 100 100"></svg>
+<div id="answers"></div>    <!-- answer buttons -->
+
+<!-- Correct / wrong overlay -->
+<div id="feedback"><div class="mark" id="mark"></div><div id="fbText"></div><button id="nextBtn">Next &#10145;&#65039;</button></div>
+
+<!-- Level unlocked celebration -->
+<div id="unlock">
+  <div class="trophy">&#127942;</div><div id="unlockText"></div>
+  <div><button id="goNew">&#9654;&#65039; <span id="goNum"></span></button><button id="stayHere">&#8617;&#65039; <span id="stayNum"></span></button></div>
+</div>
+
+<!-- Grown-up lock: multiplication question -->
+<div id="lock">
+  <div>&#128274; Grown-ups only</div><div id="lockQ"></div>
+  <input id="lockIn" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+  <div id="lockMsg"></div>
+  <div><button id="lockCancel">Cancel</button><button id="lockOk">Enter</button></div>
+</div>
+
+<!-- Parent settings -->
+<div id="settings">
+  <h2>Grown-up settings</h2>
+  <label>Starting level:
+    <select id="setLevel">
+      <option value="hour">1 &ndash; Whole hours (3:00)</option>
+      <option value="half">2 &ndash; Half past (3:30)</option>
+      <option value="quarter">3 &ndash; Quarter hours (3:15)</option>
+      <option value="five">4 &ndash; Every 5 minutes (3:25)</option>
+      <option value="minute">5 &ndash; Any minute (3:27)</option>
+    </select></label>
+  <label>How to answer:
+    <select id="setStyle"><option value="choice">Pick the time (4 buttons)</option><option value="hands">Move the clock hands</option></select></label>
+  <label>How times are written:
+    <select id="setFormat"><option value="digital">Digital (3:30)</option><option value="words">Words (half past 3)</option></select></label>
+  <label>Small minute numbers on the clock:
+    <select id="setMinuteNums"><option value="on">On</option><option value="off">Off</option></select></label>
+  <label>Correct answers to unlock next level:
+    <input id="setGoal" type="number" min="1" style="width:110px"></label>
+  <label>After a correct answer:
+    <select id="setAdvance"><option value="auto">Move on automatically</option><option value="next">Wait for Next button</option></select></label>
+  <p><button id="resetBtn">Reset scores</button></p>
+  <p><button id="closeSettings">Done</button></p>
+</div>
+
+<script>
+// ---------- Saved data (stays on this device only) ----------
+const DEFAULTS = { level: "hour", style: "choice", format: "digital", minuteNums: "on", advance: "auto",
+                   unlocked: 0,      // index of highest unlocked level (0 = level 1)
+                   goal: "100" };    // correct answers needed to unlock the next level
+let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("kc_settings") || "{}"));
+let scores = JSON.parse(localStorage.getItem("kc_scores") || "{}");
+function save() {
+  localStorage.setItem("kc_settings", JSON.stringify(settings));
+  localStorage.setItem("kc_scores", JSON.stringify(scores));
+}
+
+// Levels in order, and the minute step each one uses
+const ORDER = ["hour", "half", "quarter", "five", "minute"];
+const STEP  = { hour: 60, half: 30, quarter: 15, five: 5, minute: 1 };
+
+// Clock colours: tweak here
+const COL = { face: "#ffffff", rim: "#4a90e2", tick: "#9e9e9e", hourNum: "#333333",
+              minNum: "#4a90e2", hourHand: "#333333", minHand: "#e94e77" };
+
+// ---------- Helpers ----------
+const $ = id => document.getElementById(id);
+const rand = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;   // whole number lo..hi
+const scoreKey = () => settings.level;   // one score per level
+const pad2 = n => (n < 10 ? "0" : "") + n;
+const nextHour = h => h % 12 + 1;
+
+let tH = 12, tM = 0;      // time to read (target)
+let selH = 12, selM = 0;  // where the child has put the hands (hands mode)
+let busy = false;         // ignore taps while feedback is showing
+
+// ---------- Writing a time ----------
+function timeText(h, m) {
+  if (settings.format !== "words") return h + ":" + pad2(m);     // digital, e.g. 3:30
+  if (m === 0)  return h + " o'clock";
+  if (m === 15) return "quarter past " + h;
+  if (m === 30) return "half past " + h;
+  if (m === 45) return "quarter to " + nextHour(h);
+  const n = m < 30 ? m : 60 - m;
+  const unit = n % 5 ? (n === 1 ? " minute" : " minutes") : "";  // "25 past 3", "27 minutes past 3"
+  return m < 30 ? n + unit + " past " + h : n + unit + " to " + nextHour(h);
+}
+
+// ---------- Drawing the clock (SVG, 100 x 100, centre at 0,0) ----------
+const NS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+// Point at radius r, angle deg clockwise from 12 o'clock
+const polar = (r, deg) => [r * Math.sin(deg * Math.PI / 180), -r * Math.cos(deg * Math.PI / 180)];
+
+function drawClock(h, m) {
+  const c = $("clock");
+  c.innerHTML = "";
+  const add = (tag, attrs, text) => c.appendChild(svgEl(tag, attrs, text));
+  const showMin = settings.minuteNums === "on";
+  add("circle", { cx: 0, cy: 0, r: 47, fill: COL.face, stroke: COL.rim, "stroke-width": 2.5 });
+  for (let i = 0; i < 60; i++) {                     // minute ticks
+    const big = i % 5 === 0;
+    const [x1, y1] = polar(big ? 41.5 : 43.5, i * 6), [x2, y2] = polar(45.5, i * 6);
+    add("line", { x1, y1, x2, y2, stroke: COL.tick, "stroke-width": big ? 1.1 : 0.45 });
+  }
+  const hr = showMin ? 30.5 : 33;                    // hour numbers move out when minute numbers are off
+  for (let i = 1; i <= 12; i++) {                    // big hour numbers, always shown
+    const [x, y] = polar(hr, i * 30);
+    add("text", { x, y, "font-size": showMin ? 10 : 11.5, "font-weight": "bold", fill: COL.hourNum,
+                  "letter-spacing": i >= 10 ? -0.8 : 0,  // tighten 10, 11, 12 so they don't crowd each other
+                  "text-anchor": "middle", "dominant-baseline": "central", "font-family": "sans-serif" }, i);
+  }
+  if (showMin) for (let i = 0; i < 12; i++) {        // small minute numbers: 00, 5, 10 ... 55
+    const [x, y] = polar(38, i * 30);
+    add("text", { x, y, "font-size": 3.8, fill: COL.minNum, "text-anchor": "middle",
+                  "dominant-baseline": "central", "font-family": "sans-serif" }, i === 0 ? "00" : i * 5);
+  }
+  const hand = (deg, len, w, col) => {
+    const [x, y] = polar(len, deg);
+    add("line", { x1: 0, y1: 0, x2: x, y2: y, stroke: col, "stroke-width": w, "stroke-linecap": "round" });
+  };
+  hand((h % 12 + m / 60) * 30, 20, 3.8, COL.hourHand); // short hour hand
+  hand(m * 6, 34, 2.2, COL.minHand);                    // long minute hand
+  add("circle", { cx: 0, cy: 0, r: 2.6, fill: COL.hourHand });
+}
+
+// Draw the target time (pick mode) or the child's hands (hands mode)
+function render() {
+  if (settings.style === "hands") drawClock(selH, selM); else drawClock(tH, tM);
+}
+
+// ---------- Making problems ----------
+function newProblem() {
+  const step = STEP[settings.level];
+  let h, m;
+  do { h = rand(1, 12); m = step * rand(0, 60 / step - 1); }
+  while ((h === tH && m === tM) || (settings.style === "hands" && h === 12 && m === 0));  // new time; not where the hands start
+  tH = h; tM = m;
+}
+
+// Pick mode: right time + 3 close wrong ones (an hour off, or 1-2 steps off)
+function choices() {
+  const step = STEP[settings.level], t = (tH % 12) * 60 + tM, opts = new Set([t]);
+  for (let guard = 0; opts.size < 4 && guard < 200; guard++) {
+    const sign = Math.random() < 0.5 ? -1 : 1;
+    const d = Math.random() < 0.5 ? 60 * sign : rand(1, 2) * step * sign;
+    opts.add(((t + d) % 720 + 720) % 720);
+  }
+  return [...opts].sort(() => Math.random() - 0.5)
+    .map(v => { const h = Math.floor(v / 60); return [h === 0 ? 12 : h, v % 60]; });
+}
+
+// ---------- Answer buttons ----------
+function button(label, onTap, cls) {
+  const b = document.createElement("button");
+  b.className = cls || "ans";
+  b.textContent = label;
+  b.onclick = () => { if (!busy) onTap(); };
+  return b;
+}
+
+function drawAnswers() {
+  const box = $("answers");
+  box.innerHTML = "";
+  if (settings.style === "hands") {
+    $("target").textContent = timeText(tH, tM);       // child moves the hands to this time
+    box.appendChild(button("OK", () => check(selH === tH && selM === tM)));
+  } else {
+    $("target").textContent = "🕒 ?";
+    choices().forEach(([h, m]) => box.appendChild(button(timeText(h, m), () => check(h === tH && m === tM))));
+  }
+}
+
+// ---------- Hands mode: drag the hands ----------
+// Grab near a hand to move it. The long hand snaps to the level's minute step, the short hand to an hour.
+let dragging = null;
+function pointerPos(e) {
+  const r = $("clock").getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 100 - 50, y = (e.clientY - r.top) / r.height * 100 - 50;
+  return { deg: (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360, dist: Math.hypot(x, y) };
+}
+const angDiff = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+function moveHand(p) {
+  if (dragging === "min") {
+    const step = STEP[settings.level];
+    selM = (Math.round(p.deg / 6 / step) * step) % 60;
+  } else {
+    let h = Math.round((p.deg - selM / 2) / 30);
+    h = ((h % 12) + 12) % 12;
+    selH = h === 0 ? 12 : h;
+  }
+  render();
+}
+$("clock").addEventListener("pointerdown", e => {
+  if (busy || settings.style !== "hands") return;
+  const p = pointerPos(e);
+  const hd = angDiff(p.deg, (selH % 12 + selM / 60) * 30), md = angDiff(p.deg, selM * 6);
+  // Nearest hand by angle; if both are close, inner part = short hand, outer = long hand
+  dragging = Math.abs(hd - md) < 15 ? (p.dist < 26 ? "hour" : "min") : (hd < md ? "hour" : "min");
+  $("clock").setPointerCapture(e.pointerId);
+  moveHand(p);
+});
+$("clock").addEventListener("pointermove", e => { if (dragging) moveHand(pointerPos(e)); });
+$("clock").addEventListener("pointerup", () => { dragging = null; });
+$("clock").addEventListener("pointercancel", () => { dragging = null; });
+
+// ---------- Level buttons + progress bar ----------
+function drawLevelBar() {
+  const bar = $("levelbar");
+  bar.innerHTML = "";
+  ORDER.forEach((lv, i) => {
+    const open = i <= settings.unlocked;
+    const b = button(open ? i + 1 : "🔒", () => { settings.level = lv; save(); next(); },
+                     "lvl" + (lv === settings.level ? " on" : ""));
+    b.disabled = !open;                         // locked levels can't be tapped
+    bar.appendChild(b);
+  });
+}
+// Fills toward unlocking the next level; solid green with a trophy once complete
+function updateProgress() {
+  const idx = ORDER.indexOf(settings.level), goal = parseInt(settings.goal, 10) || 100;
+  const score = scores[scoreKey()] || 0, done = idx < settings.unlocked || score >= goal;
+  $("progressFill").style.width = done ? "100%" : Math.min(100, score / goal * 100) + "%";
+  $("progressDone").style.display = done ? "flex" : "none";
+}
+
+// ---------- Checking ----------
+function check(ok) {
+  busy = true;
+  $("feedback").style.display = "flex";
+  if (ok) {
+    scores[scoreKey()] = (scores[scoreKey()] || 0) + 1;
+    $("score").textContent = scores[scoreKey()];
+    $("mark").textContent = "✅";
+    $("mark").style.color = "";
+    $("fbText").textContent = "Correct!";
+    // Unlock the next level when the goal is reached on the highest unlocked level
+    const idx = ORDER.indexOf(settings.level), goal = parseInt(settings.goal, 10) || 100;
+    if (idx === settings.unlocked && idx < ORDER.length - 1 && scores[scoreKey()] >= goal) {
+      settings.unlocked++; save(); updateProgress(); showUnlock(idx); return;
+    }
+    save(); updateProgress();
+    if (settings.advance === "auto") { $("nextBtn").style.display = "none"; setTimeout(next, 1500); }
+    else $("nextBtn").style.display = "inline-block";
+  } else {
+    $("mark").textContent = "✖";
+    $("mark").style.color = "var(--bad)";
+    $("fbText").textContent = "Not quite, try again";
+    $("nextBtn").style.display = "none";
+    // Same time stays so the child can try again
+    setTimeout(() => { $("feedback").style.display = "none"; $("mark").style.color = ""; busy = false; }, 1500);
+  }
+}
+
+// ---------- Level unlocked celebration ----------
+function showUnlock(oldIdx) {
+  $("feedback").style.display = "none";
+  $("unlockText").textContent = "New level " + (oldIdx + 2) + "!";
+  $("goNum").textContent = oldIdx + 2;       // new level number
+  $("stayNum").textContent = oldIdx + 1;     // current level number
+  $("unlock").style.display = "flex";
+  $("goNew").onclick = () => { settings.level = ORDER[oldIdx + 1]; save(); $("unlock").style.display = "none"; next(); };
+  $("stayHere").onclick = () => { $("unlock").style.display = "none"; next(); };
+}
+
+function next() {
+  $("feedback").style.display = "none";
+  busy = false;
+  newProblem();
+  selH = 12; selM = 0;                  // hands start at 12:00
+  drawAnswers();
+  render();
+  drawLevelBar();
+  $("score").textContent = scores[scoreKey()] || 0;
+  updateProgress();
+}
+$("nextBtn").onclick = next;
+
+// ---------- Built-in grown-up lock ----------
+let lockAnswer = 0, lockThen = null;
+function newLockQuestion() {
+  const a = rand(6, 12), b = rand(6, 12);     // change range to adjust lock difficulty
+  lockAnswer = a * b;
+  $("lockQ").textContent = a + " × " + b + " = ?";
+  $("lockIn").value = "";
+}
+function openLock(fn) { lockThen = fn; newLockQuestion(); $("lockMsg").textContent = ""; $("lock").style.display = "flex"; $("lockIn").focus(); }
+function closeLock() { $("lock").style.display = "none"; $("lockIn").blur(); }
+function tryLock() {
+  if (parseInt($("lockIn").value, 10) === lockAnswer) { closeLock(); lockThen(); return; }
+  $("lockMsg").textContent = "Not quite";
+  $("lockIn").classList.remove("shake");
+  void $("lockIn").offsetWidth;                  // restart the shake animation
+  $("lockIn").classList.add("shake");
+  newLockQuestion();
+}
+$("lockOk").onclick = tryLock;
+$("lockIn").addEventListener("keydown", e => { if (e.key === "Enter") tryLock(); });
+$("lockCancel").onclick = closeLock;
+
+// ---------- Settings ----------
+const FIELDS = { setLevel: "level", setStyle: "style", setFormat: "format", setMinuteNums: "minuteNums",
+                 setGoal: "goal", setAdvance: "advance" };
+$("gear").onclick = () => { if (!busy) openLock(() => {
+  for (const id in FIELDS) $(id).value = settings[FIELDS[id]];
+  $("settings").style.display = "block";
+}); };
+$("closeSettings").onclick = () => {
+  const before = settings.level;
+  for (const id in FIELDS) settings[FIELDS[id]] = $(id).value;
+  if (settings.level !== before) settings.unlocked = ORDER.indexOf(settings.level);   // parent sets starting level
+  save();
+  $("settings").style.display = "none";
+  next();
+};
+$("resetBtn").onclick = () => {   // clears scores, keeps unlocked levels
+  if (confirm("Reset all scores?")) { scores = {}; save(); $("score").textContent = 0; updateProgress(); }
+};
+
+// ---------- Offline ----------
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// ---------- Start ----------
+next();
+</script>
+</body>
+</html>
