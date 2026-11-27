@@ -2,21 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Kids Learning</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">   <!-- iPhone/iPad home screen icon -->
 <meta name="theme-color" content="#4a90e2">
 <style>
+  /* ---------- Room for the phone's system bars ----------
+     Newer Android (and iPhones) draw the page underneath the status bar and the bottom
+     back/home buttons. The browser reports their size as safe-area insets; pad the page by that much. */
+  :root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
+          --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); }
+  body { box-sizing: border-box; padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); }
   /* One screen, no scrolling: the app buttons sit in a 2 x 2 grid sized to the screen */
-  html, body { height: 100%; overflow: hidden; }
+  html, body { height: 100%; overflow-x: hidden; overflow-y: auto; }   /* scrolls only if it can't fit */
   body { font-family: sans-serif; margin: 0; background: #fffdf5; height: 100dvh;
          display: grid; grid-template-columns: repeat(2, auto); align-content: center; justify-content: center;
          gap: clamp(12px, 3vmin, 28px); user-select: none; -webkit-user-select: none; }
   /* Big picture buttons: kids pick by picture, words are for grown-ups */
   a.app { display: flex; flex-direction: column; align-items: center; justify-content: center;
-          width: min(42vw, 40vh, 300px); height: min(42vw, 40vh, 300px); border-radius: 30px; text-decoration: none; color: #333;
+          width: min(42vw, 40vh, 300px); height: min(42vw, 40vh, 300px);
+          /* size from the space between the phone's system bars (2 rows of buttons + gaps) */
+          width: min(42vw, calc((100dvh - var(--safe-top) - var(--safe-bottom)) * 0.42), 300px);
+          height: min(42vw, calc((100dvh - var(--safe-top) - var(--safe-bottom)) * 0.42), 300px); border-radius: 30px; text-decoration: none; color: #333;
           font-size: min(7vw, 5.5vh, 34px); font-weight: bold; box-shadow: 0 6px 0 rgba(0,0,0,0.15); }
   a.app .pic { font-size: min(20vw, 17vh, 110px); line-height: 1.1; }
   #math    { background: #ffd54f; }
