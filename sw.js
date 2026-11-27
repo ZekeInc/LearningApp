@@ -1,6 +1,6 @@
 // Kids Learning service worker: saves the app on the device so it works offline.
 // IMPORTANT: when you change any file, bump this version (v1 -> v2) so devices get the update.
-const CACHE = "kids-learning-v9";
+const CACHE = "kids-learning-v10";
 
 // Every file the app needs, relative to this file (sw.js too, so the home page can show the version offline)
 const FILES = ["./", "./index.html", "./math.html", "./writing.html", "./clock.html", "./reading.html",

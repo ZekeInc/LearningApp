@@ -14,7 +14,7 @@ Simple offline learning games for ages 3–5: **Math**, **Writing**, **Clock** a
 | `math.html` | Math: 10 levels (counting, adding, take away, mixed, within 20, two-digit), unlocking, progress bar |
 | `writing.html` | Tracing: capitals, lowercase, numbers and three-letter words, with arrows and stroke order |
 | `clock.html` | Telling time: 5 levels (hours, half past, quarter hours, 5 minutes, any minute); pick the time or move the hands |
-| `reading.html` | Reading: hear a word (device voice), then pick it from 4 or spell it; 150 lesson words, starts with 20, a new word every 100 correct |
+| `reading.html` | Reading: hear a word (device voice), then pick it from 4 or spell it; 150 lesson words plus the -s, -ing and -ed endings, starts with 20, a new item every 100 correct; an unlocked ending adds a copy of every word that takes it (cat → cats) |
 | `manifest.json` | App name, icon and colours for "Add to home screen" |
 | `sw.js` | Service worker that saves the app for offline use |
 | `icon.svg` | App icon |

@@ -57,6 +57,7 @@
   /* New word celebration */
   #newword { background: #fff3c4; z-index: 10; }
   #newWordText { font-size: min(90px, 14vh); margin: 10px 0; }
+  #newExamples { font-size: min(34px, 5vh); font-weight: normal; color: #555; max-width: 90vw; }
   #newword button { font-size: 44px; min-width: 150px; min-height: 90px; margin: 10px; border: none; border-radius: 22px; }
   #sayNew { background: var(--play); color: white; }
   #newOk { background: var(--good); color: white; }
@@ -109,8 +110,10 @@
 <!-- New word unlocked -->
 <div class="overlay" id="newword">
   <div class="trophy">&#127942;</div>
-  <div>New word!</div>
+  <div id="newTitle">New word!</div>
   <div id="newWordText"></div>
+  <div id="newExamples"></div>   <!-- for a new ending: some of the words it added -->
+
   <div><button id="sayNew" aria-label="Say it">&#128266;</button><button id="newOk" aria-label="Continue">&#9654;&#65039;</button></div>
 </div>
 
@@ -143,16 +146,16 @@
 </div>
 
 <script>
-// ---------- Word list, in lesson order ----------
-// Level 1 word list from the lesson sheet. The "-s ending", "-ing ending" and "-ed ending" entries
-// (25, 62 and 137) are left out because they aren't words. Add, remove or reorder freely.
-const WORDS = [
+// ---------- Lesson list, in lesson order ----------
+// Level 1 list from the lesson sheet: 150 words plus 3 endings ("-s" is item 25, "-ing" 62, "-ed" 137).
+// Words and endings unlock one at a time, in this order. Add, remove or reorder freely.
+const LESSON = [
   "horse", "a", "car", "yellow", "see", "ball", "and", "fish", "boy", "I",
   "airplane", "the", "girl", "little", "in", "box", "green", "put", "chicken", "with",
-  "apple", "is", "big", "spoon", "my", "pencil", "red", "banana", "cow", "find",
+  "apple", "is", "big", "spoon", "-s", "my", "pencil", "red", "banana", "cow", "find",
   "egg", "water", "blue", "go", "candy", "has", "mother", "eat", "boat", "you",
   "orange", "to", "ride", "dog", "under", "tree", "long", "flower", "he", "said",
-  "black", "sky", "on", "table", "funny", "up", "bread", "cat", "school", "play",
+  "black", "sky", "on", "table", "funny", "up", "bread", "cat", "school", "play", "-ing",
   "teacher", "run", "it", "purple", "she", "father", "are", "bird", "not", "chair",
   "telephone", "or", "grass", "sit", "ice cream", "there", "we", "book", "happy", "can",
   "paper", "one", "drink", "at", "they", "cup", "fast", "will", "man", "have",
@@ -160,19 +163,57 @@ const WORDS = [
   "rabbit", "her", "jump", "two", "where", "mouse", "saw", "pretty", "bike", "me",
   "this", "animal", "come", "him", "knife", "out", "brown", "was", "picture", "by",
   "magazine", "all", "eight", "game", "had", "squirrel", "look", "pink", "vegetable", "of",
-  "plate", "new", "help", "balloon", "away", "but", "street", "do", "when", "baby",
+  "plate", "new", "help", "balloon", "-ed", "away", "but", "street", "do", "when", "baby",
   "get", "window", "am", "high", "us", "children", "were", "bear", "other", "give"
 ];
+
+// ---------- Endings ----------
+// When an ending unlocks, every unlocked word below gets a copy with that ending added to the list,
+// and words that unlock later bring their ending copies with them.
+// Only regular spellings are used: "-s" has no "-es" words (boxes, goes) and no changed words (mice, babies);
+// "-ed" has no irregular verbs (ran, sat). Add or remove pairs freely: "base word": "word with ending".
+const ENDINGS = {
+  "-s": {
+    horse: "horses", car: "cars", see: "sees", ball: "balls", boy: "boys", airplane: "airplanes", girl: "girls",
+    put: "puts", chicken: "chickens", apple: "apples", spoon: "spoons", pencil: "pencils", banana: "bananas",
+    cow: "cows", find: "finds", egg: "eggs", mother: "mothers", eat: "eats", boat: "boats", orange: "oranges",
+    ride: "rides", dog: "dogs", tree: "trees", flower: "flowers", table: "tables", cat: "cats", school: "schools",
+    play: "plays", teacher: "teachers", run: "runs", father: "fathers", bird: "birds", chair: "chairs",
+    telephone: "telephones", sit: "sits", book: "books", paper: "papers", drink: "drinks", cup: "cups",
+    elephant: "elephants", take: "takes", zoo: "zoos", rabbit: "rabbits", jump: "jumps", bike: "bikes",
+    animal: "animals", come: "comes", picture: "pictures", magazine: "magazines", game: "games",
+    squirrel: "squirrels", look: "looks", vegetable: "vegetables", plate: "plates", help: "helps",
+    balloon: "balloons", street: "streets", get: "gets", window: "windows", bear: "bears", give: "gives"
+  },
+  "-ing": {
+    see: "seeing", fish: "fishing", put: "putting", find: "finding", go: "going", eat: "eating", ride: "riding",
+    play: "playing", run: "running", sit: "sitting", drink: "drinking", take: "taking", jump: "jumping",
+    come: "coming", look: "looking", help: "helping", do: "doing", get: "getting", give: "giving"
+  },
+  "-ed": {
+    fish: "fished", water: "watered", play: "played", jump: "jumped", look: "looked", help: "helped"
+  }
+};
+const isEnding = x => x in ENDINGS;
+const WORDS = LESSON.filter(x => !isEnding(x));   // just the base words
 // Words that sound the same: never offered together, and either spelling counts as right
 const SOUNDS_SAME = [["to", "two"]];
 
 // ---------- Saved data (stays on this device only) ----------
 const DEFAULTS = { style: "choice", start: "20", goal: "100", autoSay: "on", rate: "0.8", advance: "auto" };
 let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("kr_settings") || "{}"));
-let progress = Object.assign({ unlocked: parseInt(settings.start, 10) || 20,   // how many words are in play
+const savedProgress = JSON.parse(localStorage.getItem("kr_progress") || "{}");
+let progress = Object.assign({ unlocked: parseInt(settings.start, 10) || 20,   // how many lesson items (words or endings) are unlocked
                                since: 0,     // correct answers since the last new word
                                total: 0 },   // all correct answers
-                             JSON.parse(localStorage.getItem("kr_progress") || "{}"));
+                             savedProgress);
+// One-time upgrade: the first version counted words only; now endings count as lesson items too
+if (Object.keys(savedProgress).length && !savedProgress.v) {
+  let n = 0, words = 0;
+  while (n < LESSON.length && words < progress.unlocked) { if (!isEnding(LESSON[n])) words++; n++; }
+  progress.unlocked = n;
+}
+progress.v = 2;
 function save() {
   localStorage.setItem("kr_settings", JSON.stringify(settings));
   localStorage.setItem("kr_progress", JSON.stringify(progress));
@@ -184,7 +225,22 @@ const rand = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(0, i); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const norm = w => w.trim().toLowerCase().replace(/\s+/g, " ");
 const soundsSame = (a, b) => norm(a) === norm(b) || SOUNDS_SAME.some(g => g.includes(norm(a)) && g.includes(norm(b)));
-const pool = () => WORDS.slice(0, Math.min(progress.unlocked, WORDS.length));
+// Words in play: the unlocked base words, plus the ending copies for every unlocked ending
+function pool() {
+  const items = LESSON.slice(0, Math.min(progress.unlocked, LESSON.length));
+  const base = items.filter(x => !isEnding(x));
+  const out = base.slice();
+  for (const e of items.filter(isEnding)) for (const w of base) if (ENDINGS[e][w]) out.push(ENDINGS[e][w]);
+  return out;
+}
+// The newest unlocked item, as a list of words: [the word], or every copy the newest ending added
+function newest() {
+  const item = LESSON[Math.min(progress.unlocked, LESSON.length) - 1];
+  if (!isEnding(item)) return [item];
+  const base = LESSON.slice(0, progress.unlocked).filter(x => !isEnding(x));
+  const forms = base.filter(w => ENDINGS[item][w]).map(w => ENDINGS[item][w]);
+  return forms.length ? forms : [base[base.length - 1]];
+}
 
 let word = "";      // the word being asked
 let typed = "";     // spell mode entry
@@ -216,10 +272,10 @@ $("play").onclick = () => { $("play").classList.remove("pulse"); if (!busy) say(
 // ---------- Making a question ----------
 let last = "";
 function newWord() {
-  const p = pool();
-  // A quarter of the time, ask the newest word so it gets extra practice
+  const p = pool(), fresh = newest();
+  // A quarter of the time, ask the newest word (or a word with the newest ending) for extra practice
   let w;
-  do { w = Math.random() < 0.25 ? p[p.length - 1] : p[rand(0, p.length - 1)]; }
+  do { w = Math.random() < 0.25 ? fresh[rand(0, fresh.length - 1)] : p[rand(0, p.length - 1)]; }
   while (p.length > 1 && w === last);
   word = last = w;
 }
@@ -264,9 +320,9 @@ function showTyped() { const e = $("entry"); if (e) e.textContent = typed; }
 // ---------- Progress bar ----------
 function updateTop() {
   $("score").textContent = progress.total;
-  $("wordCount").textContent = Math.min(progress.unlocked, WORDS.length);
+  $("wordCount").textContent = pool().length;              // words in play, including ending copies
   const goal = parseInt(settings.goal, 10) || 100;
-  const done = progress.unlocked >= WORDS.length;        // every word unlocked: full bar + trophy
+  const done = progress.unlocked >= LESSON.length;       // everything unlocked: full bar + trophy
   $("progressFill").style.width = done ? "100%" : Math.min(100, progress.since / goal * 100) + "%";
   $("progressDone").style.display = done ? "flex" : "none";
 }
@@ -283,7 +339,7 @@ function check(ok) {
     $("fbText").textContent = "Correct!";
     // Add the next word when the goal is reached
     const goal = parseInt(settings.goal, 10) || 100;
-    if (progress.since >= goal && progress.unlocked < WORDS.length) {
+    if (progress.since >= goal && progress.unlocked < LESSON.length) {
       progress.unlocked++;
       progress.since = 0;
       save(); updateTop();
@@ -308,9 +364,16 @@ function check(ok) {
 
 // ---------- New word celebration ----------
 function showNewWord() {
-  const w = WORDS[progress.unlocked - 1];
+  const item = LESSON[progress.unlocked - 1];
+  const ending = isEnding(item);
+  const fresh = newest();                                  // the new word, or the copies the ending added
+  const w = ending ? fresh[0] : item;                      // what the speaker button says
   $("feedback").style.display = "none";
-  $("newWordText").textContent = w;
+  $("newTitle").textContent = ending ? "New ending!" : "New word!";
+  $("newWordText").textContent = item;                     // e.g. "dog", or "-s"
+  // For an ending, show a few of the words it added, e.g. "horses, cars, sees ... +19 more"
+  $("newExamples").textContent = ending
+    ? fresh.slice(0, 4).join(", ") + (fresh.length > 4 ? "  +" + (fresh.length - 4) + " more" : "") : "";
   $("newword").style.display = "flex";
   say(w);
   $("sayNew").onclick = () => say(w);
@@ -359,7 +422,7 @@ $("closeSettings").onclick = () => {
   const before = settings.start;
   for (const id in FIELDS) settings[FIELDS[id]] = $(id).value;
   // Starting words: at least 4 (so there are 4 choices), at most the whole list
-  const s = Math.min(WORDS.length, Math.max(4, parseInt(settings.start, 10) || 20));
+  const s = Math.min(LESSON.length, Math.max(4, parseInt(settings.start, 10) || 20));   // counts lesson items (words and endings)
   settings.start = String(s);
   if (settings.start !== before) { progress.unlocked = s; progress.since = 0; }   // parent override
   save();
