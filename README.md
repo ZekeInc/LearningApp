@@ -13,7 +13,7 @@ Simple offline learning games for ages 3–5: **Math**, **Writing**, **Clock** a
 | File | What it is |
 | --- | --- |
 | `index.html` | Home page with the Math, Writing, Clock and Reading buttons, and the version number (read from `sw.js`) |
-| `math.html` | Math: 10 levels (counting, adding, take away, mixed, within 20, two-digit), unlocking, progress bar |
+| `math.html` | Math: 19 levels (counting, adding, take away, mixed, then within 20, 40, 60, 80 and 100), unlocking, progress bar |
 | `writing.html` | Tracing: capitals, lowercase, numbers and three-letter words, with arrows and stroke order |
 | `clock.html` | Telling time: 5 levels (hours, half past, quarter hours, 5 minutes, any minute); pick the time or move the hands |
 | `reading.html` | Reading: hear a word (device voice), then pick it from 4 or spell it; 150 lesson words plus the -s, -ing and -ed endings, starts with 20, the next item needs 5 correct per word in play (20 words → 100), a setting; an unlocked ending adds a copy of every word that takes it (cat → cats) |
@@ -45,11 +45,20 @@ Tap the gear and answer the multiplication question to open settings. Each app k
 | 5 | Adding (total up to 20) |
 | 6 | Take away (from 20 or less) |
 | 7 | Mixed (within 20) |
-| 8 | Adding (two digits, total up to 100) |
-| 9 | Take away (two digits) |
-| 10 | Mixed (two digits) |
+| 8 | Adding (total up to 40) |
+| 9 | Take away (from 40 or less) |
+| 10 | Mixed (within 40) |
+| 11 | Adding (total up to 60) |
+| 12 | Take away (from 60 or less) |
+| 13 | Mixed (within 60) |
+| 14 | Adding (total up to 80) |
+| 15 | Take away (from 80 or less) |
+| 16 | Mixed (within 80) |
+| 17 | Adding (two digits, total up to 100) |
+| 18 | Take away (two digits) |
+| 19 | Mixed (two digits) |
 
-Older devices are upgraded automatically. From the 8-level version: counting to 100 becomes the setting. From the 7-level version: anyone who had reached the two-digit levels goes back to the new level 5 (within 20), and their old two-digit scores are cleared; scores for levels 1–4 are kept.
+Older devices are upgraded automatically. From the 8-level version: counting to 100 becomes the setting. From the 7-level version: anyone who had reached the two-digit levels goes back to the new level 5 (within 20), and their old two-digit scores are cleared; scores for levels 1–4 are kept. From the 10-level version: anyone who had reached the up-to-100 levels goes back to the new level 8 (within 40), and their old up-to-100 scores are cleared; scores for levels 1–7 are kept.
 
 ## Updating
 

@@ -37,8 +37,11 @@
 
   /* Level buttons for kids */
   /* Level buttons: about 30% smaller than the first version (was 56px / 24px text) */
-  #levelbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 3px; }
-  .lvl { font-size: 17px; min-width: 39px; min-height: 39px; border: none; border-radius: 8px; background: #e0e0e0; }
+  /* 19 level buttons: one row on tablets, two even rows (10 + 9) on phones */
+  #levelbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 3px; margin: 0 auto; max-width: 760px; }
+  .lvl { font-size: 16px; width: 35px; min-height: 39px; padding: 0; border: none; border-radius: 8px; background: #e0e0e0; }
+  @media (max-width: 760px) { #levelbar { max-width: 376px; } .lvl { width: 32px; font-size: 15px; } }
+  @media (max-width: 380px) { #levelbar { max-width: 340px; } .lvl { width: 30px; } }
   .lvl.on { background: var(--good); color: white; }   /* current level */
   .lvl:disabled { opacity: 0.4; }                      /* locked level */
 
@@ -165,16 +168,25 @@
       <option value="add20">5 &ndash; Adding (within 20)</option>
       <option value="sub20">6 &ndash; Take away (within 20)</option>
       <option value="mix20">7 &ndash; Mixed (within 20)</option>
-      <option value="add2">8 &ndash; Adding (two digits)</option>
-      <option value="sub2">9 &ndash; Take away (two digits)</option>
-      <option value="mix2">10 &ndash; Mixed (two digits)</option>
+      <option value="add40">8 &ndash; Adding (within 40)</option>
+      <option value="sub40">9 &ndash; Take away (within 40)</option>
+      <option value="mix40">10 &ndash; Mixed (within 40)</option>
+      <option value="add60">11 &ndash; Adding (within 60)</option>
+      <option value="sub60">12 &ndash; Take away (within 60)</option>
+      <option value="mix60">13 &ndash; Mixed (within 60)</option>
+      <option value="add80">14 &ndash; Adding (within 80)</option>
+      <option value="sub80">15 &ndash; Take away (within 80)</option>
+      <option value="mix80">16 &ndash; Mixed (within 80)</option>
+      <option value="add2">17 &ndash; Adding (two digits, up to 100)</option>
+      <option value="sub2">18 &ndash; Take away (two digits, up to 100)</option>
+      <option value="mix2">19 &ndash; Mixed (two digits, up to 100)</option>
     </select>
   </label>
   <!-- Level 1 counts 0-10 by default; grown-ups can stretch it to 0-100 -->
   <label>Counting goes up to (level 1):
     <select id="setCount100"><option value="off">10</option><option value="on">100</option></select>
   </label>
-  <label>Blocks (levels 2&ndash;10):
+  <label>Blocks (levels 2&ndash;19):
     <select id="setBlocks"><option value="on">On</option><option value="off">Off (numbers only)</option></select>
   </label>
   <label>Answer style:
@@ -218,15 +230,33 @@ if (hadSaved && (savedSettings.v || 1) < 3) {
   }
   delete scores.add2; delete scores.sub2; delete scores.mix2;
 }
-settings.v = 3;   // layout version: 3 = 10 levels (within-20 levels added); counting-to-100 is a setting
-if (hadSaved && (savedSettings.v || 1) < 3) save();   // store the upgrade right away
+// One-time upgrade to version 4: within-40, within-60 and within-80 levels (8-16) added after Mixed within 20,
+// before the up-to-100 levels (now 17-19). Same rule as version 3: anyone who had reached the up-to-100 levels
+// goes back to the new level 8 (adding within 40), and the old up-to-100 scores are cleared.
+// Scores for levels 1-7 are kept.
+if (hadSaved && (savedSettings.v || 1) < 4) {
+  if (settings.unlocked >= 7) {                                     // had reached the up-to-100 levels (old 8-10)
+    settings.unlocked = 7;                                          // highest unlocked = new level 8
+    if (["add2", "sub2", "mix2"].includes(settings.level)) settings.level = "add40";
+  }
+  delete scores.add2; delete scores.sub2; delete scores.mix2;
+}
+settings.v = 4;   // layout version: 4 = 19 levels (within 20/40/60/80 added); counting-to-100 is a setting
+if (hadSaved && (savedSettings.v || 1) < 4) save();   // store the upgrade right away
 function save() {
   localStorage.setItem("km_settings", JSON.stringify(settings));
   localStorage.setItem("km_scores", JSON.stringify(scores));
 }
 
 // Level order: used for unlocking and for the level buttons
-const ORDER = ["count", "add", "sub", "mix", "add20", "sub20", "mix20", "add2", "sub2", "mix2"];
+const ORDER = ["count", "add", "sub", "mix",
+               "add20", "sub20", "mix20", "add40", "sub40", "mix40", "add60", "sub60", "mix60", "add80", "sub80", "mix80",
+               "add2", "sub2", "mix2"];
+
+// "Within" levels: the biggest number used. Adding keeps the total at or under it;
+// take away starts between half of it and it, and never goes below zero. Add a level here to add a new range.
+const WITHIN = { add20: 20, sub20: 20, mix20: 20, add40: 40, sub40: 40, mix40: 40,
+                 add60: 60, sub60: 60, mix60: 60, add80: 80, sub80: 80, mix80: 80 };
 
 // ---------- Helpers ----------
 const $ = id => document.getElementById(id);
@@ -239,8 +269,7 @@ function maxAnswer() {
     case "count": return settings.count100 === "on" ? 100 : 10;   // grown-up setting
     case "add": case "mix": return 18;
     case "sub": return 10;
-    case "add20": case "sub20": case "mix20": return 20;
-    default: return 100;          // two-digit levels
+    default: return WITHIN[settings.level] || 100;   // within 20/40/60/80, or the up-to-100 levels
   }
 }
 
@@ -304,13 +333,14 @@ function newProblem() {
   let lv = settings.level;
   if (lv === "mix")  lv = Math.random() < 0.5 ? "add"  : "sub";    // mixed: coin flip
   if (lv === "mix2") lv = Math.random() < 0.5 ? "add2" : "sub2";
-  if (lv === "mix20") lv = Math.random() < 0.5 ? "add20" : "sub20";
+  const n = WITHIN[lv];                                             // within 20/40/60/80 levels
+  if (n && lv.startsWith("mix")) lv = (Math.random() < 0.5 ? "add" : "sub") + n;
 
   if (lv === "count") { answer = rand(0, maxAnswer()); drawCount(answer); }
   else if (lv === "add")  { const a = rand(0, 9),    b = rand(0, 9);       answer = a + b; drawAdd(a, b); }
   else if (lv === "sub")  { const a = rand(0, 10),   b = rand(0, a);       answer = a - b; drawSub(a, b); }
-  else if (lv === "add20") { const a = rand(0, 20), b = rand(0, 20 - a); answer = a + b; drawAdd(a, b); }  // total <= 20
-  else if (lv === "sub20") { const a = rand(10, 20), b = rand(0, a);     answer = a - b; drawSub(a, b); }  // start 10-20, never below 0
+  else if (n && lv.startsWith("add")) { const a = rand(0, n), b = rand(0, n - a); answer = a + b; drawAdd(a, b); }      // total <= n
+  else if (n && lv.startsWith("sub")) { const a = rand(n / 2, n), b = rand(0, a); answer = a - b; drawSub(a, b); }      // start n/2..n, never below 0
   else if (lv === "add2") { const a = rand(10, 90),  b = rand(10, 100 - a); answer = a + b; drawAdd(a, b); }  // total <= 100
   else if (lv === "sub2") { const a = rand(10, 100), b = rand(10, a);       answer = a - b; drawSub(a, b); }  // never below 0
 }
