@@ -133,8 +133,9 @@
   <label>Words to start with:
     <input id="setStart" type="number" min="4" style="width:110px">
     <div class="note">Changing this sets how many words are unlocked right now (the first words on the list).</div></label>
-  <label>Correct answers to add the next word:
-    <input id="setGoal" type="number" min="1" style="width:110px"></label>
+  <label>Correct answers per word in play, to add the next word:
+    <input id="setPerWord" type="number" min="1" style="width:110px">
+    <div class="note">The next word needs this number &times; the words in play. With 5: 20 words need 100 correct, 200 words need 1000.</div></label>
   <label>Say the word automatically for each new question:
     <select id="setAutoSay"><option value="on">On</option><option value="off">Off (tap the speaker)</option></select></label>
   <label>Talking speed:
@@ -200,7 +201,7 @@ const WORDS = LESSON.filter(x => !isEnding(x));   // just the base words
 const SOUNDS_SAME = [["to", "two"]];
 
 // ---------- Saved data (stays on this device only) ----------
-const DEFAULTS = { style: "choice", start: "20", goal: "100", autoSay: "on", rate: "0.8", advance: "auto" };
+const DEFAULTS = { style: "choice", start: "20", perWord: "5", autoSay: "on", rate: "0.8", advance: "auto" };
 let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("kr_settings") || "{}"));
 const savedProgress = JSON.parse(localStorage.getItem("kr_progress") || "{}");
 let progress = Object.assign({ unlocked: parseInt(settings.start, 10) || 20,   // how many lesson items (words or endings) are unlocked
@@ -233,6 +234,10 @@ function pool() {
   for (const e of items.filter(isEnding)) for (const w of base) if (ENDINGS[e][w]) out.push(ENDINGS[e][w]);
   return out;
 }
+// Correct answers needed for the next word: grows with the list, so every word keeps coming up.
+// perWord (default 5) x words in play: 20 words -> 100, 200 words -> 1000.
+const goalNow = () => (parseInt(settings.perWord, 10) || 5) * pool().length;
+
 // The newest unlocked item, as a list of words: [the word], or every copy the newest ending added
 function newest() {
   const item = LESSON[Math.min(progress.unlocked, LESSON.length) - 1];
@@ -321,7 +326,7 @@ function showTyped() { const e = $("entry"); if (e) e.textContent = typed; }
 function updateTop() {
   $("score").textContent = progress.total;
   $("wordCount").textContent = pool().length;              // words in play, including ending copies
-  const goal = parseInt(settings.goal, 10) || 100;
+  const goal = goalNow();
   const done = progress.unlocked >= LESSON.length;       // everything unlocked: full bar + trophy
   $("progressFill").style.width = done ? "100%" : Math.min(100, progress.since / goal * 100) + "%";
   $("progressDone").style.display = done ? "flex" : "none";
@@ -338,8 +343,7 @@ function check(ok) {
     $("mark").style.color = "";
     $("fbText").textContent = "Correct!";
     // Add the next word when the goal is reached
-    const goal = parseInt(settings.goal, 10) || 100;
-    if (progress.since >= goal && progress.unlocked < LESSON.length) {
+    if (progress.since >= goalNow() && progress.unlocked < LESSON.length) {
       progress.unlocked++;
       progress.since = 0;
       save(); updateTop();
@@ -413,7 +417,7 @@ $("lockIn").addEventListener("keydown", e => { if (e.key === "Enter") tryLock();
 $("lockCancel").onclick = closeLock;
 
 // ---------- Settings ----------
-const FIELDS = { setStyle: "style", setStart: "start", setGoal: "goal", setAutoSay: "autoSay", setRate: "rate", setAdvance: "advance" };
+const FIELDS = { setStyle: "style", setStart: "start", setPerWord: "perWord", setAutoSay: "autoSay", setRate: "rate", setAdvance: "advance" };
 $("gear").onclick = () => { if (!busy) openLock(() => {
   for (const id in FIELDS) $(id).value = settings[FIELDS[id]];
   $("settings").style.display = "block";
