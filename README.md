@@ -1,6 +1,6 @@
 # Kids Learning
 
-Simple offline learning games for ages 3–5: **Math**, **Writing** and **Clock** (Pronunciation coming later).
+Simple offline learning games for ages 3–5: **Math**, **Writing**, **Clock** and **Reading** (Pronunciation coming later).
 
 - Plain HTML, CSS and JavaScript. No libraries, no build step, no accounts.
 - Everything is saved only on the device (browser storage). Nothing is sent anywhere.
@@ -10,10 +10,11 @@ Simple offline learning games for ages 3–5: **Math**, **Writing** and **Clock*
 
 | File | What it is |
 | --- | --- |
-| `index.html` | Home page with the Math, Writing and Clock buttons, and the version number (read from `sw.js`) |
+| `index.html` | Home page with the Math, Writing, Clock and Reading buttons, and the version number (read from `sw.js`) |
 | `math.html` | Math: 10 levels (counting, adding, take away, mixed, within 20, two-digit), unlocking, progress bar |
 | `writing.html` | Tracing: capitals, lowercase, numbers and three-letter words, with arrows and stroke order |
 | `clock.html` | Telling time: 5 levels (hours, half past, quarter hours, 5 minutes, any minute); pick the time or move the hands |
+| `reading.html` | Reading: hear a word (device voice), then pick it from 4 or spell it; 150 lesson words, starts with 20, a new word every 100 correct |
 | `manifest.json` | App name, icon and colours for "Add to home screen" |
 | `sw.js` | Service worker that saves the app for offline use |
 | `icon.svg` | App icon |

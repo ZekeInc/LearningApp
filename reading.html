@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Kids Reading</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#4a90e2">
+<style>
+  /* ---------- Colours: tweak here ---------- */
+  :root { --good: #2e9e44; --bad: #e8833a; --btn: #ffd54f; --play: #e94e77; }
+
+  /* The page is exactly one screen tall (no scrolling) */
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: sans-serif; margin: 0; background: #fffdf5; text-align: center; user-select: none; -webkit-user-select: none;
+         height: 100dvh; display: flex; flex-direction: column; }
+  body > * { flex: none; }
+  #topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 22px; }
+  #topbar a, #gear { font-size: 30px; text-decoration: none; background: none; border: none; }
+
+  /* Progress bar toward the next new word */
+  #progress { position: relative; height: 30px; margin: 0 14px 6px; background: #e0e0e0; border-radius: 15px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0; background: var(--good); border-radius: 15px; transition: width 0.3s; }
+  #progressDone { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: white; }
+
+  /* Big play button: says the word. Fills the space between the top and the answers. */
+  #stage { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  /* Round button sized to the space it has (never bigger than its area, so it can't cover the top bar) */
+  #play { height: min(50vw, 32vh, 260px, 96%); width: auto; aspect-ratio: 1; padding: 0; border-radius: 50%; border: none;
+          background: var(--play); color: white; font-size: min(22vw, 14vh, 120px); line-height: 1; overflow: hidden;
+          box-shadow: 0 8px 0 rgba(0,0,0,0.18); }
+  #play:active { transform: translateY(4px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
+  #play.pulse { animation: pulse 1.4s infinite; }   /* pulses until first tap (browsers need a tap before speaking) */
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+  /* Pick mode: word buttons */
+  #answers { width: 100%; max-width: 720px; margin: 0 auto; padding: 8px 12px 12px; box-sizing: border-box; }
+  .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ans { font-size: clamp(24px, 5vh, 48px); min-height: clamp(56px, 11vh, 110px); border: none; border-radius: 18px;
+         background: var(--btn); font-weight: bold; padding: 4px 8px; }
+
+  /* Spell mode: what they've typed + an alphabet keyboard */
+  #entry { font-size: clamp(30px, 6vh, 56px); font-weight: bold; min-height: 1.3em; letter-spacing: 3px;
+           border-bottom: 4px solid #ccc; margin: 0 auto 8px; max-width: 520px; }
+  .keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .key { font-size: clamp(20px, 3.6vh, 34px); min-height: clamp(40px, 6.6vh, 64px); border: none; border-radius: 10px; background: var(--btn); padding: 0; }
+  .key.wide { grid-column: span 2; }
+  .key.ok { background: var(--good); color: white; font-weight: bold; }
+  .key.soft { background: #e0e0e0; }
+
+  /* Feedback overlay */
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; font-size: 48px; font-weight: bold; }
+  #feedback { background: rgba(255,255,255,0.92); }
+  #feedback .mark, #newword .trophy { font-size: min(180px, 25vh); line-height: 1; }
+  #nextBtn { font-size: 36px; padding: 16px 40px; margin-top: 20px; border: none; border-radius: 18px; background: var(--good); color: white; }
+  /* New word celebration */
+  #newword { background: #fff3c4; z-index: 10; }
+  #newWordText { font-size: min(90px, 14vh); margin: 10px 0; }
+  #newword button { font-size: 44px; min-width: 150px; min-height: 90px; margin: 10px; border: none; border-radius: 22px; }
+  #sayNew { background: var(--play); color: white; }
+  #newOk { background: var(--good); color: white; }
+
+  /* Settings screen */
+  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings label { display: block; margin: 14px 0; }
+  #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
+  #settings .note { font-size: 16px; color: #666; }
+
+  /* Grown-up lock */
+  #lock { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #f2f2f2; z-index: 30; font-size: 30px; }
+  #lockQ { font-size: 56px; font-weight: bold; }
+  #lockIn { font-size: 44px; width: 180px; text-align: center; padding: 8px; border: 3px solid #999; border-radius: 14px; }
+  #lockMsg { min-height: 36px; color: var(--bad); font-weight: bold; }
+  #lock button { font-size: 28px; min-width: 140px; min-height: 64px; border: none; border-radius: 16px; margin: 0 8px; }
+  #lockOk { background: var(--good); color: white; }
+  #lockCancel { background: #cfcfcf; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-12px); } 75% { transform: translateX(12px); } }
+
+  /* Short screens (phone sideways): smaller top bar, and the keyboard in 3 wide rows instead of 5 */
+  @media (max-height: 560px) {
+    #topbar { padding: 2px 14px; } #topbar a, #gear { font-size: 24px; }
+    #progress { height: 22px; margin-bottom: 3px; }
+    #entry { margin-bottom: 4px; }
+  }
+  @media (max-height: 560px) and (min-width: 600px) {
+    .keys { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar: home, correct answers, words unlocked, settings gear -->
+<div id="topbar">
+  <a href="index.html" aria-label="Home">&#127968;</a>
+  <span>&#11088; <span id="score">0</span> &nbsp; &#128218; <span id="wordCount">20</span></span>
+  <button id="gear" aria-label="Grown-up settings">&#9881;&#65039;</button>
+</div>
+
+<div id="progress"><div id="progressFill"></div><div id="progressDone">&#127942; All words! &#11088;</div></div>
+
+<div id="stage"><button id="play" class="pulse" aria-label="Say the word">&#128266;</button></div>
+<div id="answers"></div>   <!-- word buttons, or the spelling keyboard -->
+
+<!-- Correct / wrong overlay -->
+<div class="overlay" id="feedback"><div class="mark" id="mark"></div><div id="fbText"></div><button id="nextBtn">Next &#10145;&#65039;</button></div>
+
+<!-- New word unlocked -->
+<div class="overlay" id="newword">
+  <div class="trophy">&#127942;</div>
+  <div>New word!</div>
+  <div id="newWordText"></div>
+  <div><button id="sayNew" aria-label="Say it">&#128266;</button><button id="newOk" aria-label="Continue">&#9654;&#65039;</button></div>
+</div>
+
+<!-- Grown-up lock: multiplication question -->
+<div id="lock">
+  <div>&#128274; Grown-ups only</div><div id="lockQ"></div>
+  <input id="lockIn" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+  <div id="lockMsg"></div>
+  <div><button id="lockCancel">Cancel</button><button id="lockOk">Enter</button></div>
+</div>
+
+<!-- Parent settings -->
+<div id="settings">
+  <h2>Grown-up settings</h2>
+  <label>How to answer:
+    <select id="setStyle"><option value="choice">Pick the word (4 buttons)</option><option value="spell">Spell the word</option></select></label>
+  <label>Words to start with:
+    <input id="setStart" type="number" min="4" style="width:110px">
+    <div class="note">Changing this sets how many words are unlocked right now (the first words on the list).</div></label>
+  <label>Correct answers to add the next word:
+    <input id="setGoal" type="number" min="1" style="width:110px"></label>
+  <label>Say the word automatically for each new question:
+    <select id="setAutoSay"><option value="on">On</option><option value="off">Off (tap the speaker)</option></select></label>
+  <label>Talking speed:
+    <select id="setRate"><option value="0.6">Slow</option><option value="0.8">Medium</option><option value="1">Normal</option></select></label>
+  <label>After a correct answer:
+    <select id="setAdvance"><option value="auto">Move on automatically</option><option value="next">Wait for Next button</option></select></label>
+  <p><button id="resetBtn">Reset progress</button></p>
+  <p><button id="closeSettings">Done</button></p>
+</div>
+
+<script>
+// ---------- Word list, in lesson order ----------
+// Level 1 word list from the lesson sheet. The "-s ending", "-ing ending" and "-ed ending" entries
+// (25, 62 and 137) are left out because they aren't words. Add, remove or reorder freely.
+const WORDS = [
+  "horse", "a", "car", "yellow", "see", "ball", "and", "fish", "boy", "I",
+  "airplane", "the", "girl", "little", "in", "box", "green", "put", "chicken", "with",
+  "apple", "is", "big", "spoon", "my", "pencil", "red", "banana", "cow", "find",
+  "egg", "water", "blue", "go", "candy", "has", "mother", "eat", "boat", "you",
+  "orange", "to", "ride", "dog", "under", "tree", "long", "flower", "he", "said",
+  "black", "sky", "on", "table", "funny", "up", "bread", "cat", "school", "play",
+  "teacher", "run", "it", "purple", "she", "father", "are", "bird", "not", "chair",
+  "telephone", "or", "grass", "sit", "ice cream", "there", "we", "book", "happy", "can",
+  "paper", "one", "drink", "at", "they", "cup", "fast", "will", "man", "have",
+  "elephant", "slow", "scissors", "take", "good", "six", "what", "for", "zoo", "milk",
+  "rabbit", "her", "jump", "two", "where", "mouse", "saw", "pretty", "bike", "me",
+  "this", "animal", "come", "him", "knife", "out", "brown", "was", "picture", "by",
+  "magazine", "all", "eight", "game", "had", "squirrel", "look", "pink", "vegetable", "of",
+  "plate", "new", "help", "balloon", "away", "but", "street", "do", "when", "baby",
+  "get", "window", "am", "high", "us", "children", "were", "bear", "other", "give"
+];
+// Words that sound the same: never offered together, and either spelling counts as right
+const SOUNDS_SAME = [["to", "two"]];
+
+// ---------- Saved data (stays on this device only) ----------
+const DEFAULTS = { style: "choice", start: "20", goal: "100", autoSay: "on", rate: "0.8", advance: "auto" };
+let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("kr_settings") || "{}"));
+let progress = Object.assign({ unlocked: parseInt(settings.start, 10) || 20,   // how many words are in play
+                               since: 0,     // correct answers since the last new word
+                               total: 0 },   // all correct answers
+                             JSON.parse(localStorage.getItem("kr_progress") || "{}"));
+function save() {
+  localStorage.setItem("kr_settings", JSON.stringify(settings));
+  localStorage.setItem("kr_progress", JSON.stringify(progress));
+}
+
+// ---------- Helpers ----------
+const $ = id => document.getElementById(id);
+const rand = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(0, i); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const norm = w => w.trim().toLowerCase().replace(/\s+/g, " ");
+const soundsSame = (a, b) => norm(a) === norm(b) || SOUNDS_SAME.some(g => g.includes(norm(a)) && g.includes(norm(b)));
+const pool = () => WORDS.slice(0, Math.min(progress.unlocked, WORDS.length));
+
+let word = "";      // the word being asked
+let typed = "";     // spell mode entry
+let busy = false;   // ignore taps while an overlay is showing
+
+// ---------- Speaking (the device's own voice; no internet needed if the device has its voice installed) ----------
+let voice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+  // Prefer a voice stored on the device, and US/UK English
+  voice = vs.find(v => v.localService && /en[-_]US/i.test(v.lang)) || vs.find(v => v.localService) ||
+          vs.find(v => /en[-_]US/i.test(v.lang)) || vs[0] || null;
+}
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+function say(text) {
+  if (!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  // Single letters are read as letter names, so say "a" as "uh"; "I" is fine as "eye"
+  const spoken = text === "a" ? "uh" : text;
+  const u = new SpeechSynthesisUtterance(spoken);
+  if (voice) u.voice = voice;
+  u.lang = voice ? voice.lang : "en-US";
+  u.rate = parseFloat(settings.rate) || 0.8;
+  speechSynthesis.speak(u);
+}
+$("play").onclick = () => { $("play").classList.remove("pulse"); if (!busy) say(word); };
+
+// ---------- Making a question ----------
+let last = "";
+function newWord() {
+  const p = pool();
+  // A quarter of the time, ask the newest word so it gets extra practice
+  let w;
+  do { w = Math.random() < 0.25 ? p[p.length - 1] : p[rand(0, p.length - 1)]; }
+  while (p.length > 1 && w === last);
+  word = last = w;
+}
+
+// ---------- Answer area ----------
+function button(label, onTap, cls) {
+  const b = document.createElement("button");
+  b.className = cls || "ans";
+  b.textContent = label;
+  b.onclick = () => { if (!busy) onTap(); };
+  return b;
+}
+
+function drawAnswers() {
+  const box = $("answers");
+  box.innerHTML = "";
+  typed = "";
+  if (settings.style === "spell") {
+    const entry = document.createElement("div");
+    entry.id = "entry";
+    box.appendChild(entry);
+    const keys = document.createElement("div");
+    keys.className = "keys";
+    // Lowercase only: capitals don't matter when checking, so "i" counts for the word "I"
+    for (const ch of "abcdefghijklmnopqrstuvwxyz") keys.appendChild(button(ch, () => typeKey(ch), "key"));
+    keys.appendChild(button("␣", () => typeKey(" "), "key soft"));          // space, for "ice cream"
+    keys.appendChild(button("⌫", () => { typed = typed.slice(0, -1); showTyped(); }, "key soft wide"));
+    keys.appendChild(button("OK", () => { if (typed.trim()) check(soundsSame(typed, word)); }, "key ok wide"));
+    box.appendChild(keys);
+  } else {
+    // Right word + 3 others from the unlocked words (never a sound-alike)
+    const others = shuffle(pool().filter(w => !soundsSame(w, word))).slice(0, 3);
+    const grid = document.createElement("div");
+    grid.className = "choices";
+    shuffle([word, ...others]).forEach(w => grid.appendChild(button(w, () => check(w === word))));
+    box.appendChild(grid);
+  }
+}
+function typeKey(ch) { if (typed.length < 14) { typed += ch; showTyped(); } }
+function showTyped() { const e = $("entry"); if (e) e.textContent = typed; }
+
+// ---------- Progress bar ----------
+function updateTop() {
+  $("score").textContent = progress.total;
+  $("wordCount").textContent = Math.min(progress.unlocked, WORDS.length);
+  const goal = parseInt(settings.goal, 10) || 100;
+  const done = progress.unlocked >= WORDS.length;        // every word unlocked: full bar + trophy
+  $("progressFill").style.width = done ? "100%" : Math.min(100, progress.since / goal * 100) + "%";
+  $("progressDone").style.display = done ? "flex" : "none";
+}
+
+// ---------- Checking ----------
+function check(ok) {
+  busy = true;
+  $("feedback").style.display = "flex";
+  if (ok) {
+    progress.total++;
+    progress.since++;
+    $("mark").textContent = "✅";
+    $("mark").style.color = "";
+    $("fbText").textContent = "Correct!";
+    // Add the next word when the goal is reached
+    const goal = parseInt(settings.goal, 10) || 100;
+    if (progress.since >= goal && progress.unlocked < WORDS.length) {
+      progress.unlocked++;
+      progress.since = 0;
+      save(); updateTop();
+      setTimeout(showNewWord, 900);
+      return;
+    }
+    save(); updateTop();
+    if (settings.advance === "auto") { $("nextBtn").style.display = "none"; setTimeout(next, 1500); }
+    else $("nextBtn").style.display = "inline-block";
+  } else {
+    $("mark").textContent = "✖";
+    $("mark").style.color = "var(--bad)";
+    $("fbText").textContent = "Not quite, try again";
+    $("nextBtn").style.display = "none";
+    // Same word stays; say it again so they can have another go
+    setTimeout(() => {
+      $("feedback").style.display = "none"; busy = false; drawAnswers();
+      if (settings.autoSay === "on") say(word);
+    }, 1500);
+  }
+}
+
+// ---------- New word celebration ----------
+function showNewWord() {
+  const w = WORDS[progress.unlocked - 1];
+  $("feedback").style.display = "none";
+  $("newWordText").textContent = w;
+  $("newword").style.display = "flex";
+  say(w);
+  $("sayNew").onclick = () => say(w);
+  $("newOk").onclick = () => { $("newword").style.display = "none"; next(); };
+}
+
+function next() {
+  $("feedback").style.display = "none";
+  busy = false;
+  newWord();
+  drawAnswers();
+  updateTop();
+  if (settings.autoSay === "on") say(word);   // works once the child has tapped something
+}
+$("nextBtn").onclick = next;
+
+// ---------- Built-in grown-up lock ----------
+let lockAnswer = 0, lockThen = null;
+function newLockQuestion() {
+  const a = rand(6, 12), b = rand(6, 12);     // change range to adjust lock difficulty
+  lockAnswer = a * b;
+  $("lockQ").textContent = a + " × " + b + " = ?";
+  $("lockIn").value = "";
+}
+function openLock(fn) { lockThen = fn; newLockQuestion(); $("lockMsg").textContent = ""; $("lock").style.display = "flex"; $("lockIn").focus(); }
+function closeLock() { $("lock").style.display = "none"; $("lockIn").blur(); }
+function tryLock() {
+  if (parseInt($("lockIn").value, 10) === lockAnswer) { closeLock(); lockThen(); return; }
+  $("lockMsg").textContent = "Not quite";
+  $("lockIn").classList.remove("shake");
+  void $("lockIn").offsetWidth;                  // restart the shake animation
+  $("lockIn").classList.add("shake");
+  newLockQuestion();
+}
+$("lockOk").onclick = tryLock;
+$("lockIn").addEventListener("keydown", e => { if (e.key === "Enter") tryLock(); });
+$("lockCancel").onclick = closeLock;
+
+// ---------- Settings ----------
+const FIELDS = { setStyle: "style", setStart: "start", setGoal: "goal", setAutoSay: "autoSay", setRate: "rate", setAdvance: "advance" };
+$("gear").onclick = () => { if (!busy) openLock(() => {
+  for (const id in FIELDS) $(id).value = settings[FIELDS[id]];
+  $("settings").style.display = "block";
+}); };
+$("closeSettings").onclick = () => {
+  const before = settings.start;
+  for (const id in FIELDS) settings[FIELDS[id]] = $(id).value;
+  // Starting words: at least 4 (so there are 4 choices), at most the whole list
+  const s = Math.min(WORDS.length, Math.max(4, parseInt(settings.start, 10) || 20));
+  settings.start = String(s);
+  if (settings.start !== before) { progress.unlocked = s; progress.since = 0; }   // parent override
+  save();
+  $("settings").style.display = "none";
+  next();
+};
+$("resetBtn").onclick = () => {
+  if (!confirm("Reset reading progress?")) return;
+  progress = { unlocked: parseInt(settings.start, 10) || 20, since: 0, total: 0 };
+  save();
+  next();
+};
+
+// ---------- Offline ----------
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// ---------- Start ----------
+next();
+</script>
+</body>
+</html>
