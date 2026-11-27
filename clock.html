@@ -2,13 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Kids Clock</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">   <!-- iPhone/iPad home screen icon -->
 <meta name="theme-color" content="#4a90e2">
 <style>
+  /* ---------- Room for the phone's system bars ----------
+     Newer Android (and iPhones) draw the page underneath the status bar and the bottom
+     back/home buttons. The browser reports their size as safe-area insets; pad the page by that much. */
+  :root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
+          --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); }
+  body { box-sizing: border-box; padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); }
   /* ---------- Colours: tweak here (clock colours are in the script, COL) ---------- */
   :root { --good: #2e9e44; --bad: #e8833a; --btn: #ffd54f; }
   /* The page is one screen tall; the script (fitScreen) measures the real screen and sizes the clock to the space left.
@@ -53,6 +59,9 @@
              width: 100%; max-width: 640px; margin: 0 auto; box-sizing: border-box; }
   #answers:has(> :only-child) { grid-template-columns: minmax(0, 160px); justify-content: center; }   /* hands mode: one OK button */
   @media (min-width: 700px) { #answers { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 900px; } }
+  /* Short, wide screens (phone sideways): one row of 4 so the clock keeps more room */
+  @media (max-height: 560px) and (min-width: 560px) { #answers { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 900px; }
+    .ans { font-size: 17px; min-height: 44px; } }
   .ans { font-size: clamp(17px, 3.4vh, 32px); min-height: clamp(44px, 8vh, 80px); padding: 2px 8px; border: none;
          border-radius: 16px; background: var(--btn); line-height: 1.15; }
   @media (max-width: 500px) { #target { font-size: 34px; } }
@@ -70,7 +79,8 @@
   #stayHere { background: #cfcfcf; }
 
   /* Settings screen */
-  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings { position: fixed; inset: 0; background: white; display: none;
+              padding: calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left)); font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
   #settings label { display: block; margin: 14px 0; }
   #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
 
@@ -283,7 +293,8 @@ function drawAnswers() {
 function fitScreen() {
   const screenH = window.innerHeight, clock = $("clock");
   document.body.style.height = screenH + "px";
-  let used = 0;
+  const bs = getComputedStyle(document.body);
+  let used = parseFloat(bs.paddingTop) + parseFloat(bs.paddingBottom);   // room kept for the phone's status bar and back/home buttons
   for (const el of document.body.children) {
     if (el === clock || el.tagName === "SCRIPT") continue;
     const cs = getComputedStyle(el);

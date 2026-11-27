@@ -2,13 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Kids Writing</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">   <!-- iPhone/iPad home screen icon -->
 <meta name="theme-color" content="#4a90e2">
 <style>
+  /* ---------- Room for the phone's system bars ----------
+     Newer Android (and iPhones) draw the page underneath the status bar and the bottom
+     back/home buttons. The browser reports their size as safe-area insets; pad the page by that much. */
+  :root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
+          --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); }
+  body { box-sizing: border-box; padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); }
   /* ---------- Colours: tweak here ---------- */
   :root {
     --guide: #e6e6e6;      /* grey letter to trace */
@@ -50,7 +56,8 @@
   #levelup button { font-size: 44px; min-width: 150px; min-height: 100px; margin-top: 20px; border: none; border-radius: 22px; background: var(--good); color: white; }
 
   /* Settings */
-  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings { position: fixed; inset: 0; background: white; display: none;
+              padding: calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left)); font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
   #settings label { display: block; margin: 14px 0; }
   #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
 
@@ -327,7 +334,9 @@ function buildTarget(w, h) {
 function layout() {
   const dpr = window.devicePixelRatio || 1;
   // Pad height = what's left after the top bar, progress bar and buttons (measured, so it fits any screen)
-  const used = $("topbar").offsetHeight + $("progress").offsetHeight + $("tools").offsetHeight + 24;
+  const bs = getComputedStyle(document.body);   // room kept for the phone's status bar and back/home buttons
+  const used = $("topbar").offsetHeight + $("progress").offsetHeight + $("tools").offsetHeight + 24
+             + parseFloat(bs.paddingTop) + parseFloat(bs.paddingBottom);
   const maxH = Math.max(120, window.innerHeight - used);
   let w, h;
   if (isWord()) {

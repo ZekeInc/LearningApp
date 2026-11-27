@@ -2,13 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Kids Reading</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">   <!-- iPhone/iPad home screen icon -->
 <meta name="theme-color" content="#4a90e2">
 <style>
+  /* ---------- Room for the phone's system bars ----------
+     Newer Android (and iPhones) draw the page underneath the status bar and the bottom
+     back/home buttons. The browser reports their size as safe-area insets; pad the page by that much. */
+  :root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
+          --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); }
+  body { box-sizing: border-box; padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); }
   /* ---------- Colours: tweak here ---------- */
   :root { --good: #2e9e44; --bad: #e8833a; --btn: #ffd54f; --play: #e94e77; }
 
@@ -65,7 +71,8 @@
   #newOk { background: var(--good); color: white; }
 
   /* Settings screen */
-  #settings { position: fixed; inset: 0; background: white; display: none; padding: 20px; font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
+  #settings { position: fixed; inset: 0; background: white; display: none;
+              padding: calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left)); font-size: 22px; text-align: left; overflow: auto; z-index: 20; }
   #settings label { display: block; margin: 14px 0; }
   #settings select, #settings button, #settings input { font-size: 22px; padding: 6px 12px; }
   #settings .note { font-size: 16px; color: #666; }
@@ -85,7 +92,9 @@
   @media (max-height: 560px) {
     #topbar { padding: 2px 14px; } #topbar a, #gear { font-size: 24px; }
     #progress { height: 22px; margin-bottom: 3px; }
-    #entry { margin-bottom: 4px; }
+    #entry { margin-bottom: 4px; font-size: 26px; }
+    .key { min-height: 34px; font-size: 20px; }     /* smaller keys so the speaker button still has room */
+    .ans { min-height: 48px; font-size: 22px; }
   }
   @media (max-height: 560px) and (min-width: 600px) {
     .keys { grid-template-columns: repeat(11, minmax(0, 1fr)); }
@@ -329,17 +338,18 @@ function drawAnswers() {
 function fitScreen() {
   const screenH = window.innerHeight, stage = $("stage"), play = $("play");
   document.body.style.height = screenH + "px";
-  let used = 0;
+  const bs = getComputedStyle(document.body);
+  let used = parseFloat(bs.paddingTop) + parseFloat(bs.paddingBottom);   // room kept for the phone's status bar and back/home buttons
   for (const el of document.body.children) {
     if (el === stage || el.tagName === "SCRIPT") continue;
     const cs = getComputedStyle(el);
     if (cs.position === "fixed" || cs.display === "none") continue;      // overlays don't take space
     used += el.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
   }
-  const space = Math.max(90, Math.floor(screenH - used - 2));           // never smaller than 90px
+  const space = Math.max(56, Math.floor(screenH - used - 2));           // never smaller than 56px
   stage.style.height = space + "px";
   // Button: up to 260px, at most half the screen width, with room for its shadow
-  const size = Math.max(70, Math.min(260, window.innerWidth * 0.5, space - 14));
+  const size = Math.max(46, Math.min(260, window.innerWidth * 0.5, space - 12));
   play.style.width = play.style.height = size + "px";
   play.style.fontSize = Math.round(size * 0.46) + "px";
 }
