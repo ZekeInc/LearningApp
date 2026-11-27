@@ -1,5 +1,7 @@
 # Kids Learning
 
+**Open the app: https://zekeinc.github.io/LearningApp/**
+
 Simple offline learning games for ages 3–5: **Math**, **Writing**, **Clock** and **Reading** (Pronunciation coming later).
 
 - Plain HTML, CSS and JavaScript. No libraries, no build step, no accounts.
@@ -17,11 +19,20 @@ Simple offline learning games for ages 3–5: **Math**, **Writing**, **Clock** a
 | `reading.html` | Reading: hear a word (device voice), then pick it from 4 or spell it; 150 lesson words plus the -s, -ing and -ed endings, starts with 20, the next item needs 5 correct per word in play (20 words → 100), a setting; an unlocked ending adds a copy of every word that takes it (cat → cats) |
 | `manifest.json` | App name, icon and colours for "Add to home screen" |
 | `sw.js` | Service worker that saves the app for offline use |
-| `icon.svg` | App icon |
+| `icon.svg` | App icon (the design; the PNGs below are made from it) |
+| `icon-192.png`, `icon-512.png` | App icon for Android and "Add to home screen" |
+| `apple-touch-icon.png` | App icon for iPhone and iPad home screens |
 
 ## Grown-up settings
 
-Tap the gear and answer the multiplication question to open settings.
+Tap the gear and answer the multiplication question to open settings. Each app keeps its own settings and progress on the device.
+
+| App | Settings |
+| --- | --- |
+| Math | Starting level, blocks on or off, counting up to 100, answer style (number buttons or 4 choices), correct answers to unlock the next level, auto-advance or Next button |
+| Writing | Letters, numbers or words, capitals or lowercase, order, stroke order check, starting strictness (1–10), good traces before strictness goes up |
+| Clock | Starting level, answer style (pick the time or move the hands), digital or words, small minute numbers, correct answers to unlock, auto-advance or Next button |
+| Reading | Pick the word or spell it, words to start with, correct answers per word in play, say the word automatically, talking speed, auto-advance or Next button |
 
 ### Math levels
 
@@ -42,4 +53,8 @@ Older devices are upgraded automatically. From the 8-level version: counting to 
 
 ## Updating
 
-When you change any file, bump the `CACHE` version in `sw.js` (for example `kids-learning-v1` to `kids-learning-v2`). Otherwise devices keep the old saved copy.
+When you change any file, bump the `CACHE` version in `sw.js` (for example `kids-learning-v1` to `kids-learning-v2`). Otherwise devices keep the old saved copy. The home page shows this version in the top right corner, so you can check which version a device has.
+
+If you add a new file, also add it to the `FILES` list in `sw.js` so it works offline.
+
+Make changes on a branch and open a pull request into `main`. GitHub Pages publishes `main`, so merging the pull request updates the live app.

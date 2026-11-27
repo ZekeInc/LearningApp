@@ -6,6 +6,7 @@
 <title>Kids Writing</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">   <!-- iPhone/iPad home screen icon -->
 <meta name="theme-color" content="#4a90e2">
 <style>
   /* ---------- Colours: tweak here ---------- */
@@ -31,6 +32,12 @@
   #pad { display: block; margin: 0 auto; background: white; border: 4px dashed #ccc; border-radius: 16px; touch-action: none; }
   #tools { display: flex; justify-content: center; gap: 30px; padding: 12px; }
   #tools button { font-size: 48px; min-width: 120px; min-height: 90px; border: none; border-radius: 20px; }
+  /* Short screens (phone sideways): smaller top bar and buttons so the drawing pad still fits */
+  @media (max-height: 560px) {
+    #topbar { padding: 2px 14px; } #topbar a, #gear { font-size: 24px; }
+    #progress { height: 22px; margin-bottom: 3px; }
+    #tools { padding: 6px; } #tools button { font-size: 34px; min-height: 58px; min-width: 100px; }
+  }
   #checkBtn { background: var(--good); color: white; }
   #clearBtn { background: #e0e0e0; }
 
@@ -319,7 +326,9 @@ function buildTarget(w, h) {
 // Size the pad (wide for words), rebuild the target, redraw
 function layout() {
   const dpr = window.devicePixelRatio || 1;
-  const maxH = Math.max(200, window.innerHeight - 280);
+  // Pad height = what's left after the top bar, progress bar and buttons (measured, so it fits any screen)
+  const used = $("topbar").offsetHeight + $("progress").offsetHeight + $("tools").offsetHeight + 24;
+  const maxH = Math.max(120, window.innerHeight - used);
   let w, h;
   if (isWord()) {
     // Use the full screen width; make the pad just tall enough for the letters
@@ -327,7 +336,7 @@ function layout() {
     const side = Math.min(w * 0.94 / wordUnits(), maxH * 0.85);
     h = Math.min(maxH, side * 1.18);
   }
-  else { w = h = Math.max(200, Math.min(window.innerWidth - 40, maxH)); }
+  else { w = h = Math.max(120, Math.min(window.innerWidth - 40, maxH)); }
   pad.style.width = w + "px";
   pad.style.height = h + "px";
   const nw = Math.round(w * dpr), nh = Math.round(h * dpr);

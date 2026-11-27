@@ -1,14 +1,17 @@
 // Kids Learning service worker: saves the app on the device so it works offline.
 // IMPORTANT: when you change any file, bump this version (v1 -> v2) so devices get the update.
-const CACHE = "kids-learning-v11";
+const CACHE = "kids-learning-v12";
 
 // Every file the app needs, relative to this file (sw.js too, so the home page can show the version offline)
 const FILES = ["./", "./index.html", "./math.html", "./writing.html", "./clock.html", "./reading.html",
-               "./manifest.json", "./icon.svg", "./sw.js"];
+               "./manifest.json", "./icon.svg", "./icon-192.png", "./icon-512.png",
+               "./apple-touch-icon.png", "./sw.js"];
 
 // First visit: save all files
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
+  // cache: "reload" skips the browser's normal cache, so a new version never saves stale copies
+  // (GitHub Pages lets browsers keep files for up to 10 minutes)
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: "reload" })))));
   self.skipWaiting();                        // start using this version right away
 });
 
