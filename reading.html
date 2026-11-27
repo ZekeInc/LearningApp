@@ -12,10 +12,11 @@
   /* ---------- Colours: tweak here ---------- */
   :root { --good: #2e9e44; --bad: #e8833a; --btn: #ffd54f; --play: #e94e77; }
 
-  /* The page is exactly one screen tall (no scrolling) */
-  html, body { height: 100%; overflow: hidden; }
+  /* The page is one screen tall; the script (fitScreen) measures the real screen and sizes the speaker button to the space left.
+     If something still doesn't fit (very small screen, big text), the page scrolls instead of cutting it off. */
+  html, body { height: 100%; overflow-x: hidden; overflow-y: auto; }
   body { font-family: sans-serif; margin: 0; background: #fffdf5; text-align: center; user-select: none; -webkit-user-select: none;
-         height: 100dvh; display: flex; flex-direction: column; }
+         display: flex; flex-direction: column; }
   body > * { flex: none; }
   #topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 22px; }
   #topbar a, #gear { font-size: 30px; text-decoration: none; background: none; border: none; }
@@ -26,10 +27,10 @@
   #progressDone { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: white; }
 
   /* Big play button: says the word. Fills the space between the top and the answers. */
-  #stage { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; }
-  /* Round button sized to the space it has (never bigger than its area, so it can't cover the top bar) */
-  #play { height: min(50vw, 32vh, 260px, 96%); width: auto; aspect-ratio: 1; padding: 0; border-radius: 50%; border: none;
-          background: var(--play); color: white; font-size: min(22vw, 14vh, 120px); line-height: 1; overflow: hidden;
+  #stage { flex: none; height: 300px; display: flex; align-items: center; justify-content: center; }   /* height set by fitScreen() */
+  /* Round button; its size is set by fitScreen() to fit the space it has */
+  #play { width: 200px; height: 200px; padding: 0; border-radius: 50%; border: none;
+          background: var(--play); color: white; font-size: 90px; line-height: 1; overflow: hidden;
           box-shadow: 0 8px 0 rgba(0,0,0,0.18); }
   #play:active { transform: translateY(4px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
   #play.pulse { animation: pulse 1.4s infinite; }   /* pulses until first tap (browsers need a tap before speaking) */
@@ -319,7 +320,33 @@ function drawAnswers() {
     shuffle([word, ...others]).forEach(w => grid.appendChild(button(w, () => check(w === word))));
     box.appendChild(grid);
   }
+  fitScreen();          // picking and spelling take different heights, so re-fit the speaker button
 }
+
+// ---------- Fit everything on one screen ----------
+// Measures the real visible screen height (works the same in every browser) and gives the speaker
+// button whatever is left after the top bar and answers.
+function fitScreen() {
+  const screenH = window.innerHeight, stage = $("stage"), play = $("play");
+  document.body.style.height = screenH + "px";
+  let used = 0;
+  for (const el of document.body.children) {
+    if (el === stage || el.tagName === "SCRIPT") continue;
+    const cs = getComputedStyle(el);
+    if (cs.position === "fixed" || cs.display === "none") continue;      // overlays don't take space
+    used += el.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+  }
+  const space = Math.max(90, Math.floor(screenH - used - 2));           // never smaller than 90px
+  stage.style.height = space + "px";
+  // Button: up to 260px, at most half the screen width, with room for its shadow
+  const size = Math.max(70, Math.min(260, window.innerWidth * 0.5, space - 14));
+  play.style.width = play.style.height = size + "px";
+  play.style.fontSize = Math.round(size * 0.46) + "px";
+}
+window.addEventListener("resize", fitScreen);
+window.addEventListener("orientationchange", () => setTimeout(fitScreen, 300));   // some tablets report the new size late
+if (window.visualViewport) visualViewport.addEventListener("resize", fitScreen); // browser toolbars showing or hiding
+window.addEventListener("load", fitScreen);                                     // re-fit once emoji and fonts have drawn
 function typeKey(ch) { if (typed.length < 14) { typed += ch; showTyped(); } }
 function showTyped() { const e = $("entry"); if (e) e.textContent = typed; }
 
